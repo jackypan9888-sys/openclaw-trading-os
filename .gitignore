@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+
+# 数据文件（存在 ~/.openclaw/trading-os/，不进仓库）
+*.db
+*.sqlite
+*.sqlite3
+logs/
+
+# 敏感配置（token/API key 通过 openclaw.json 注入，不进仓库）
+.env
+config.json
+secrets.json
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Dashboard build output（Phase 2）
+dashboard/frontend/node_modules/
+dashboard/frontend/dist/
+dashboard/frontend/.env.local

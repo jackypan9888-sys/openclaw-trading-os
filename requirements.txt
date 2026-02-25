@@ -1,0 +1,16 @@
+# OpenClaw Trading OS — Phase 1 依赖
+# 安装: uv pip install -r requirements.txt
+
+# 调度器
+APScheduler>=3.10.0
+
+# Telegram Bot
+python-telegram-bot>=21.0
+
+# 时区支持
+pytz>=2024.1
+python-dateutil>=2.9.0
+
+# 市场数据（现有环境通常已有）
+yfinance>=0.2.40
+pandas>=2.0.0
