@@ -1,0 +1,9 @@
+{
+  "telegram_token": "",
+  "log_level": "INFO",
+  "ai": {
+    "primary_model": "kimi/kimi-k2.5",
+    "fallback_model": "anthropic-custom/claude-sonnet-4",
+    "timeout_seconds": 15
+  }
+}

@@ -62,8 +62,8 @@ pip install -r requirements.txt
 # 初始化数据库
 python3 -c "import sys; sys.path.insert(0,'.');from db.store import DataStore; DataStore().init_db(); print('OK')"
 
-# 启动 Daemon（Day 5 后可用）
-python3 run_daemon.py
+# 启动 Dashboard Backend
+uvicorn dashboard.backend.main:app --host 127.0.0.1 --port 8080 --reload
 ```
 
 ## 核心设计
@@ -94,7 +94,7 @@ python3 run_daemon.py
 ### 订阅层级
 | 层级 | 价格 | 自选股 | 预警/天 | AI 分析 |
 |---|---|---|---|---|
-| Free | $0 | 5只 | 10条 | 无 |
+| Free | $0 | 50只 | 10条 | 无 |
 | Pro | $29/月 | 无限 | 100条 | 每条含 |
 
 ## 复用现有资产
@@ -123,3 +123,5 @@ from stock_analysis.scripts import rumor_scanner
 ## 风险提示
 
 ⚠️ **NOT FINANCIAL ADVICE** — 仅供技术研究与学习使用
+
+> 详细运行说明、目录结构与后续路线图请见仓库 `README.md`。

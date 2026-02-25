@@ -6,8 +6,8 @@ import asyncio
 import json
 import hashlib
 import hmac
-import time
-from typing import Optional, Callable
+import os
+from typing import Optional
 import websockets
 
 class OpenClawClient:
@@ -154,9 +154,14 @@ def send_to_openclaw(message: str, token: str, gateway_url: str = "ws://127.0.0.
 if __name__ == "__main__":
     # 测试
     import sys
-    token = "cc83a5a39fe092421e17ba630a734e6cab89ac79230c4bd50192067b15cd6b28"
+    token = os.getenv("OPENCLAW_GATEWAY_TOKEN", "")
+    gateway_url = os.getenv("OPENCLAW_GATEWAY_URL", "ws://127.0.0.1:18789/rpc")
     message = sys.argv[1] if len(sys.argv) > 1 else "你好，简短回复：你是谁？"
-    
+
+    if not token:
+        print("Missing OPENCLAW_GATEWAY_TOKEN environment variable.")
+        raise SystemExit(1)
+
     print(f"Sending: {message}")
-    result = send_to_openclaw(message, token)
+    result = send_to_openclaw(message, token, gateway_url=gateway_url)
     print(f"Response: {result}")
