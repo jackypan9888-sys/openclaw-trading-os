@@ -106,6 +106,98 @@ async def root():
     return FileResponse(str(STATIC_DIR / "index.html"))
 
 
+# 热门股票列表（用于搜索提示）
+POPULAR_SYMBOLS = [
+    # 美股科技
+    {"symbol": "AAPL", "name": "Apple Inc.", "market": "US"},
+    {"symbol": "MSFT", "name": "Microsoft Corporation", "market": "US"},
+    {"symbol": "GOOGL", "name": "Alphabet Inc.", "market": "US"},
+    {"symbol": "AMZN", "name": "Amazon.com Inc.", "market": "US"},
+    {"symbol": "NVDA", "name": "NVIDIA Corporation", "market": "US"},
+    {"symbol": "META", "name": "Meta Platforms Inc.", "market": "US"},
+    {"symbol": "TSLA", "name": "Tesla Inc.", "market": "US"},
+    {"symbol": "AMD", "name": "Advanced Micro Devices", "market": "US"},
+    {"symbol": "NFLX", "name": "Netflix Inc.", "market": "US"},
+    {"symbol": "CRM", "name": "Salesforce Inc.", "market": "US"},
+    {"symbol": "INTC", "name": "Intel Corporation", "market": "US"},
+    {"symbol": "ORCL", "name": "Oracle Corporation", "market": "US"},
+    {"symbol": "ADBE", "name": "Adobe Inc.", "market": "US"},
+    {"symbol": "CSCO", "name": "Cisco Systems", "market": "US"},
+    {"symbol": "QCOM", "name": "Qualcomm Inc.", "market": "US"},
+    # 美股金融
+    {"symbol": "JPM", "name": "JPMorgan Chase", "market": "US"},
+    {"symbol": "V", "name": "Visa Inc.", "market": "US"},
+    {"symbol": "MA", "name": "Mastercard Inc.", "market": "US"},
+    {"symbol": "BAC", "name": "Bank of America", "market": "US"},
+    {"symbol": "GS", "name": "Goldman Sachs", "market": "US"},
+    # 美股消费
+    {"symbol": "WMT", "name": "Walmart Inc.", "market": "US"},
+    {"symbol": "KO", "name": "Coca-Cola Company", "market": "US"},
+    {"symbol": "PEP", "name": "PepsiCo Inc.", "market": "US"},
+    {"symbol": "MCD", "name": "McDonald's Corp.", "market": "US"},
+    {"symbol": "NKE", "name": "Nike Inc.", "market": "US"},
+    {"symbol": "SBUX", "name": "Starbucks Corp.", "market": "US"},
+    # 美股其他
+    {"symbol": "DIS", "name": "Walt Disney Company", "market": "US"},
+    {"symbol": "BA", "name": "Boeing Company", "market": "US"},
+    {"symbol": "XOM", "name": "Exxon Mobil", "market": "US"},
+    {"symbol": "JNJ", "name": "Johnson & Johnson", "market": "US"},
+    {"symbol": "PFE", "name": "Pfizer Inc.", "market": "US"},
+    {"symbol": "UNH", "name": "UnitedHealth Group", "market": "US"},
+    # 港股
+    {"symbol": "0700.HK", "name": "腾讯控股", "market": "HK"},
+    {"symbol": "9988.HK", "name": "阿里巴巴", "market": "HK"},
+    {"symbol": "9618.HK", "name": "京东集团", "market": "HK"},
+    {"symbol": "3690.HK", "name": "美团", "market": "HK"},
+    {"symbol": "1810.HK", "name": "小米集团", "market": "HK"},
+    {"symbol": "9888.HK", "name": "百度集团", "market": "HK"},
+    {"symbol": "2318.HK", "name": "中国平安", "market": "HK"},
+    {"symbol": "0941.HK", "name": "中国移动", "market": "HK"},
+    {"symbol": "1299.HK", "name": "友邦保险", "market": "HK"},
+    {"symbol": "0005.HK", "name": "汇丰控股", "market": "HK"},
+    {"symbol": "2020.HK", "name": "安踏体育", "market": "HK"},
+    {"symbol": "9999.HK", "name": "网易", "market": "HK"},
+    {"symbol": "0388.HK", "name": "香港交易所", "market": "HK"},
+    {"symbol": "2382.HK", "name": "舜宇光学", "market": "HK"},
+    {"symbol": "1211.HK", "name": "比亚迪股份", "market": "HK"},
+    # 加密货币
+    {"symbol": "BTC-USD", "name": "Bitcoin 比特币", "market": "Crypto"},
+    {"symbol": "ETH-USD", "name": "Ethereum 以太坊", "market": "Crypto"},
+    {"symbol": "BNB-USD", "name": "BNB 币安币", "market": "Crypto"},
+    {"symbol": "SOL-USD", "name": "Solana", "market": "Crypto"},
+    {"symbol": "XRP-USD", "name": "Ripple 瑞波币", "market": "Crypto"},
+    {"symbol": "ADA-USD", "name": "Cardano 艾达币", "market": "Crypto"},
+    {"symbol": "DOGE-USD", "name": "Dogecoin 狗狗币", "market": "Crypto"},
+    {"symbol": "DOT-USD", "name": "Polkadot 波卡", "market": "Crypto"},
+    {"symbol": "MATIC-USD", "name": "Polygon", "market": "Crypto"},
+    {"symbol": "LINK-USD", "name": "Chainlink", "market": "Crypto"},
+    {"symbol": "AVAX-USD", "name": "Avalanche", "market": "Crypto"},
+    {"symbol": "UNI-USD", "name": "Uniswap", "market": "Crypto"},
+]
+
+
+@app.get("/api/search")
+async def search_symbols(q: str = ""):
+    """搜索股票代码/名称"""
+    if not q or len(q) < 1:
+        return []
+    
+    q_upper = q.upper()
+    q_lower = q.lower()
+    
+    results = []
+    for item in POPULAR_SYMBOLS:
+        # 匹配代码或名称
+        if (q_upper in item["symbol"].upper() or 
+            q_lower in item["name"].lower() or
+            q_upper in item["name"].upper()):
+            results.append(item)
+        if len(results) >= 10:  # 最多返回 10 个
+            break
+    
+    return results
+
+
 @app.get("/api/price/{symbol}")
 async def get_price(symbol: str):
     loop = asyncio.get_event_loop()
@@ -193,6 +285,53 @@ async def analyze(symbol: str):
         return {"error": "Analysis timed out (45s)", "symbol": symbol}
     except Exception as e:
         return {"error": str(e), "symbol": symbol}
+
+
+@app.post("/api/chat")
+async def chat(request: dict):
+    """
+    调用 OpenClaw agent 处理聊天消息
+    前端发送: {"message": "分析 AAPL"}
+    返回: {"reply": "...AI 回复..."}
+    """
+    message = request.get("message", "").strip()
+    if not message:
+        return {"reply": "请输入消息"}
+    
+    # 构建上下文提示
+    context = f"""你是 Trading OS 的 AI 助手，帮助用户分析股票和加密货币。
+用户问题: {message}
+
+请简洁回答（不超过 200 字），如果涉及股票分析，给出具体建议。
+如果用户问的是特定股票代码，告诉他们当前价格和你的看法。"""
+    
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: subprocess.run(
+                ["openclaw", "agent", "--message", context, "--json"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env={**os.environ, "OPENCLAW_QUIET": "1"}
+            ),
+        )
+        
+        if result.returncode == 0 and result.stdout.strip():
+            try:
+                data = json.loads(result.stdout)
+                reply = data.get("reply") or data.get("response") or data.get("message") or result.stdout
+            except json.JSONDecodeError:
+                reply = result.stdout.strip()
+            return {"reply": reply}
+        else:
+            # 回退到简单响应
+            return {"reply": f"收到你的问题：{message}\n\n请使用左侧搜索框添加股票，然后点击「AI 分析」获取详细分析。"}
+    except subprocess.TimeoutExpired:
+        return {"reply": "分析超时，请稍后重试。"}
+    except Exception as e:
+        return {"reply": f"抱歉，暂时无法处理。请直接使用「AI 分析」按钮。"}
 
 
 @app.get("/api/hot")

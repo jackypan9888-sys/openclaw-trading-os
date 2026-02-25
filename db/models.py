@@ -50,7 +50,7 @@ ALERT_COOLDOWN = {
 # 层级权限配置
 TIER_LIMITS = {
     'free': {
-        'max_symbols':       5,
+        'max_symbols':       50,  # 提高到 50 只
         'alert_types':       ['stop_hit', 'target_hit'],
         'ai_summary':        False,
         'max_alerts_per_day': 10,
