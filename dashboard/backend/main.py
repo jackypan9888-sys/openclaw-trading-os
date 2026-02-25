@@ -287,51 +287,343 @@ async def analyze(symbol: str):
         return {"error": str(e), "symbol": symbol}
 
 
+# AI 配置文件路径
+AI_CONFIG_PATH = Path.home() / ".openclaw" / "trading-os" / "ai_config.json"
+
+
+def format_market_cap(cap):
+    """格式化市值"""
+    if not cap:
+        return "N/A"
+    if cap >= 1e12:
+        return f"${cap/1e12:.2f}T"
+    elif cap >= 1e9:
+        return f"${cap/1e9:.2f}B"
+    elif cap >= 1e6:
+        return f"${cap/1e6:.2f}M"
+    else:
+        return f"${cap:,.0f}"
+
+
+def format_volume(vol):
+    """格式化成交量"""
+    if not vol:
+        return "N/A"
+    if vol >= 1e9:
+        return f"{vol/1e9:.2f}B"
+    elif vol >= 1e6:
+        return f"{vol/1e6:.2f}M"
+    elif vol >= 1e3:
+        return f"{vol/1e3:.2f}K"
+    else:
+        return f"{vol:,.0f}"
+
+def load_ai_config():
+    """加载 AI 配置"""
+    if AI_CONFIG_PATH.exists():
+        with open(AI_CONFIG_PATH) as f:
+            return json.load(f)
+    # 默认配置
+    return {
+        "provider": "anthropic",
+        "api_key": "",  # 用户需要自己配置
+        "model": "claude-sonnet-4-20250514",
+        "persona": "木木的小奴"
+    }
+
+def save_ai_config(config: dict):
+    """保存 AI 配置"""
+    AI_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(AI_CONFIG_PATH, "w") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
+
+
+@app.get("/api/ai/config")
+async def get_ai_config():
+    """获取 AI 配置（隐藏完整 API key）"""
+    config = load_ai_config()
+    # 隐藏 API key，只显示前后几位
+    if config.get("api_key"):
+        key = config["api_key"]
+        config["api_key_masked"] = f"{key[:10]}...{key[-4:]}" if len(key) > 14 else "***"
+        config["api_key_set"] = True
+    else:
+        config["api_key_masked"] = ""
+        config["api_key_set"] = False
+    del config["api_key"]
+    return config
+
+
+@app.post("/api/ai/config")
+async def set_ai_config(request: dict):
+    """更新 AI 配置"""
+    config = load_ai_config()
+    if "api_key" in request and request["api_key"]:
+        config["api_key"] = request["api_key"]
+    if "model" in request:
+        config["model"] = request["model"]
+    if "persona" in request:
+        config["persona"] = request["persona"]
+    if "provider" in request:
+        config["provider"] = request["provider"]
+    save_ai_config(config)
+    return {"success": True, "message": "配置已保存"}
+
+
 @app.post("/api/chat")
 async def chat(request: dict):
     """
-    调用 OpenClaw agent 处理聊天消息
-    前端发送: {"message": "分析 AAPL"}
-    返回: {"reply": "...AI 回复..."}
+    调用 OpenClaw trading-os agent 处理聊天消息
+    使用 stock-analysis 和 crypto-price 技能进行专业分析
     """
+    import re
+    
     message = request.get("message", "").strip()
+    context = request.get("context", {})
+    
     if not message:
         return {"reply": "请输入消息"}
     
-    # 构建上下文提示
-    context = f"""你是 Trading OS 的 AI 助手，帮助用户分析股票和加密货币。
-用户问题: {message}
-
-请简洁回答（不超过 200 字），如果涉及股票分析，给出具体建议。
-如果用户问的是特定股票代码，告诉他们当前价格和你的看法。"""
+    # 检测分析意图和标的
+    upper_msg = message.upper()
     
+    # 匹配股票代码 (AAPL, 0700.HK, 港股腾讯等)
+    stock_match = re.search(r'\b([A-Z]{1,5})\b|\b(\d{4,5})\.?HK\b|港股\s*(\d{4,5}|[\u4e00-\u9fa5]+)', message)
+    
+    # 匹配加密货币 (BTC, ETH, SOL 等)
+    crypto_match = re.search(r'\b(BTC|ETH|SOL|BNB|XRP|ADA|DOGE|DOT|AVAX|MATIC|LINK|ATOM|UNI|LTC|BCH|XLM|ALGO|VET|FIL|NEAR|HYPE)\b', upper_msg)
+    
+    # 检测分析关键词
+    is_analysis = re.search(r'分析|怎么看|如何|建议|点评|evaluate|analyze', message)
+    is_price_query = re.search(r'价格|price|多少钱|查询', message)
+    
+    # ========== 股票分析 ==========
+    if is_analysis and stock_match and not crypto_match:
+        symbol = stock_match.group(1) or stock_match.group(2) or stock_match.group(3)
+        if stock_match.group(2) or stock_match.group(3):  # 港股
+            symbol = symbol + '.HK' if not symbol.endswith('.HK') else symbol
+        
+        return await analyze_stock_with_skill(symbol, message)
+    
+    # ========== 加密货币分析 ==========
+    elif is_analysis and crypto_match:
+        symbol = crypto_match.group(1)
+        return await analyze_crypto_with_skill(symbol, message)
+    
+    # ========== 普通对话 ==========
+    return await chat_with_agent(message, context)
+
+
+async def analyze_stock_with_skill(symbol: str, original_message: str) -> dict:
+    """使用 muquant market.py 获取实时价格 + stock-analysis 深度分析"""
+    try:
+        loop = asyncio.get_event_loop()
+        
+        # 第1步: 用 market.py 获取最准确的实时价格
+        market_result = await loop.run_in_executor(
+            None,
+            lambda: subprocess.run(
+                ["python3", str(WORKSPACE / "skills" / "muquant" / "commands" / "market.py"), 
+                 symbol, "--json"],
+                capture_output=True,
+                text=True,
+                timeout=15
+            ),
+        )
+        
+        market_data = {}
+        if market_result.returncode == 0:
+            try:
+                market_data = json.loads(market_result.stdout)
+            except:
+                pass
+        
+        # 第2步: 用 stock-analysis 获取深度分析
+        analysis_result = await loop.run_in_executor(
+            None,
+            lambda: subprocess.run(
+                ["uv", "run", str(WORKSPACE / "skills" / "stock-analysis" / "scripts" / "analyze_stock.py"), 
+                 symbol, "--output", "json", "--fast"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=str(WORKSPACE / "skills" / "stock-analysis")
+            ),
+        )
+        
+        analysis_data = {}
+        if analysis_result.returncode == 0:
+            try:
+                analysis_data = json.loads(analysis_result.stdout)
+            except:
+                pass
+        
+        # 合并数据构建回复
+        price = market_data.get('price', analysis_data.get('price', 'N/A'))
+        change_pct = market_data.get('change_pct', analysis_data.get('change_pct', 0))
+        emoji = "🟢" if change_pct >= 0 else "🔴"
+        
+        score = analysis_data.get("total_score", "N/A")
+        recommendation = analysis_data.get("recommendation", "--")
+        summary = analysis_data.get("ai_summary", "")
+        
+        # 市值和PE优先用 market.py 的数据（更实时）
+        market_cap = market_data.get('market_cap') or analysis_data.get('market_cap')
+        pe_ratio = market_data.get('pe_ratio') or analysis_data.get('pe_ratio')
+        
+        reply = f"""🦞 **{symbol}** 实时分析报告 ⚔️
+
+### 💰 实时行情 (Yahoo Finance)
+| 指标 | 数据 | 信号 |
+|------|------|------|
+| **现价** | **${price}** | {emoji} |
+| **涨跌** | **{change_pct:+.2f}%** | {"🚀" if change_pct > 2 else "📉" if change_pct < -2 else "➡️"} |
+| **市值** | {format_market_cap(market_cap)} | 💎 |
+| **PE** | {f"{pe_ratio:.2f}" if pe_ratio else "N/A"} | {"⚠️ 偏高" if pe_ratio and pe_ratio > 30 else "✅ 合理" if pe_ratio else "--"} |
+
+### 📊 AI评分: {score}/100 | 建议: {recommendation}
+
+{summary}
+
+---
+*数据来源: Yahoo Finance via market.py | 分析模型: stock-analysis v6.2*
+*⚠️ 仅供参考，不构成投资建议*"""
+        
+        return {"reply": reply}
+        
+    except Exception as e:
+        # 出错时回退到 agent
+        return await chat_with_agent(f"分析股票 {symbol}：{original_message}", {})
+
+
+async def analyze_crypto_with_skill(symbol: str, original_message: str) -> dict:
+    """使用 muquant market.py 获取实时价格 + crypto-price K线图表"""
+    try:
+        loop = asyncio.get_event_loop()
+        
+        # 第1步: 用 market.py 获取最准确的实时价格 (BTC-USD 格式)
+        yf_symbol = f"{symbol}-USD" if not symbol.endswith('-USD') else symbol
+        market_result = await loop.run_in_executor(
+            None,
+            lambda: subprocess.run(
+                ["python3", str(WORKSPACE / "skills" / "muquant" / "commands" / "market.py"), 
+                 yf_symbol, "--json"],
+                capture_output=True,
+                text=True,
+                timeout=15
+            ),
+        )
+        
+        market_data = {}
+        if market_result.returncode == 0:
+            try:
+                market_data = json.loads(market_result.stdout)
+            except:
+                pass
+        
+        # 第2步: 用 crypto-price 获取K线图表
+        chart_result = await loop.run_in_executor(
+            None,
+            lambda: subprocess.run(
+                ["python3", str(WORKSPACE / "skills" / "crypto-price" / "scripts" / "get_price_chart.py"), 
+                 symbol, "1d"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=str(WORKSPACE / "skills" / "crypto-price")
+            ),
+        )
+        
+        chart_data = {}
+        if chart_result.returncode == 0:
+            try:
+                chart_data = json.loads(chart_result.stdout)
+            except:
+                pass
+        
+        # 合并数据
+        price = market_data.get('price', chart_data.get('price', 'N/A'))
+        change_pct = market_data.get('change_pct', chart_data.get('change_period_percent', 0))
+        emoji = "🟢" if change_pct >= 0 else "🔴"
+        chart_path = chart_data.get('chart_path', '')
+        
+        # 市值和成交量
+        market_cap = market_data.get('market_cap')
+        volume = market_data.get('volume')
+        
+        reply = f"""🦞 **{symbol}** 加密货币实时分析 🪙
+
+### 💰 实时行情 (Yahoo Finance)
+| 指标 | 数据 | 信号 |
+|------|------|------|
+| **现价** | **${price}** | {emoji} |
+| **24h涨跌** | **{change_pct:+.2f}%** | {"🚀" if change_pct > 5 else "📉" if change_pct < -5 else "➡️"} |
+| **市值** | {format_market_cap(market_cap)} | 💎 |
+| **24h成交量** | {format_volume(volume)} | 📊 |
+
+### 📈 技术分析
+{chart_data.get('text_plain', '技术面分析数据获取中...')}
+
+---
+*数据来源: Yahoo Finance via market.py | K线: CoinGecko*
+*⚠️ 加密市场波动剧烈，请注意风险*"""
+        
+        # 如果有图表路径，添加
+        if chart_path and os.path.exists(chart_path):
+            reply += f"\n\n📊 **K线图表已生成**: {chart_path}"
+        
+        return {"reply": reply}
+        
+    except Exception as e:
+        # 出错时回退到 agent
+        return await chat_with_agent(f"分析加密货币 {symbol}：{original_message}", {})
+
+
+async def chat_with_agent(message: str, context: dict) -> dict:
+    """与 OpenClaw agent 对话 - 带超时和降级机制"""
+    # 添加上下文信息
+    active_symbol = context.get("activeSymbol", "")
+    if active_symbol:
+        message = f"[当前查看: {active_symbol}] {message}"
+    
+    # 首先尝试用 web_search 快速回答（3秒内）
     try:
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
             None,
             lambda: subprocess.run(
-                ["openclaw", "agent", "--message", context, "--json"],
+                [
+                    "openclaw", "agent",
+                    "--agent", "trading-os",
+                    "--session-id", "trading-os-web",
+                    "-m", message,
+                    "--thinking", "off"  # 关闭思考，加速响应
+                ],
                 capture_output=True,
                 text=True,
-                timeout=60,
+                timeout=15,  # 15秒超时
                 env={**os.environ, "OPENCLAW_QUIET": "1"}
             ),
         )
         
         if result.returncode == 0 and result.stdout.strip():
-            try:
-                data = json.loads(result.stdout)
-                reply = data.get("reply") or data.get("response") or data.get("message") or result.stdout
-            except json.JSONDecodeError:
-                reply = result.stdout.strip()
-            return {"reply": reply}
-        else:
-            # 回退到简单响应
-            return {"reply": f"收到你的问题：{message}\n\n请使用左侧搜索框添加股票，然后点击「AI 分析」获取详细分析。"}
+            # 清理输出
+            output = result.stdout.strip()
+            lines = output.split('\n')
+            clean_lines = [l for l in lines if not l.startswith('Config warnings') and not l.startswith('-')]
+            reply = '\n'.join(clean_lines).strip()
+            if reply:
+                return {"reply": reply}
+        
+        # Agent 没返回有效内容，降级到快速模式
+        return {"reply": "🦞 龙虾交易助手收到！\n\n当前系统繁忙，请稍后再试，或直接查询股票代码（如：分析 AAPL）"}
+        
     except subprocess.TimeoutExpired:
-        return {"reply": "分析超时，请稍后重试。"}
+        # 超时，返回友好提示
+        return {"reply": "⏳ 龙虾交易助手思考超时了...\n\n💡 试试这些快捷命令：\n• 分析 AAPL\n• 查询 BTC价格\n• 扫描热点"}
     except Exception as e:
-        return {"reply": f"抱歉，暂时无法处理。请直接使用「AI 分析」按钮。"}
+        # 出错也返回友好提示
+        return {"reply": "⚠️ 连接暂时不稳定\n\n💡 您可以：\n• 刷新页面重试\n• 使用左侧快捷操作（AI分析/热点扫描）"}
 
 
 @app.get("/api/hot")

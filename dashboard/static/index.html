@@ -181,7 +181,6 @@
     <div class="search-dropdown" id="search-dropdown"></div>
   </div>
   <span style="color:var(--muted);font-size:12px;"><span class="status-dot"></span>实时</span>
-  <span style="color:var(--muted);font-size:12px);margin-left:auto;">OpenClaw Trading OS v0.1</span>
 </div>
 
 <!-- ── 主布局 ── -->
@@ -234,18 +233,30 @@
 
     <!-- Chat Tab -->
     <div class="panel-body" id="tab-chat">
+      <!-- OpenClaw 快捷入口 -->
+      <div style="padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:8px;display:flex;gap:8px;align-items:center;">
+        <button class="btn" onclick="window.open('http://127.0.0.1:18789/','_blank')" style="flex:1;">
+          🦞 打开 OpenClaw 完整版
+        </button>
+        <span style="font-size:11px;color:var(--muted);">全部工具</span>
+      </div>
+      
+      <!-- 内置 AI 聊天 -->
       <div class="chat-messages" id="chat-messages">
         <div class="msg ai">
-          👋 你好！我是 OpenClaw AI 助手。<br><br>
-          你可以问我：<br>
-          • <b>分析 AAPL</b> — AI 8维度评分<br>
-          • <b>NVDA 怎么样</b> — 市场解读<br>
-          • <b>热点</b> — 今日热点资产<br>
-          • 或直接输入任意股票代码
+          🦞 <b>龙虾交易助手</b> 已上线！<br><br>
+          我是横跨 <b>港股🇭🇰 美股🇺🇸 Crypto🪙</b> 的多边形交易战士，也是 <b>MuQuant</b> 量化系统的搭建者。<br><br>
+          <b>🔥 常用指令：</b><br>
+          • <code>分析 AAPL</code> — 技术面+基本面分析<br>
+          • <code>搜索 腾讯财报</code> — 实时资讯抓取<br>
+          • <code>BTC价格</code> — 加密货币行情<br>
+          • <code>热点</code> — 扫描市场热点<br>
+          • <code>预警 AAPL 200</code> — 价格提醒<br><br>
+          <span style="color:var(--muted);font-size:11px;">💡 直接输入问题，我随时为你分析！</span>
         </div>
       </div>
       <div class="chat-input-wrap">
-        <textarea class="chat-input" id="chat-input" placeholder="问 OpenClaw..." rows="1"
+        <textarea class="chat-input" id="chat-input" placeholder="问 AI 助手..." rows="1"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"
         ></textarea>
         <button class="btn" onclick="sendChat()">发送</button>
@@ -611,16 +622,36 @@ async function sendChat() {
 
   appendMsg('user', text);
 
-  // 解析意图
+  // 解析股票代码 - 更智能的匹配
   const upper = text.toUpperCase();
-  const tickerMatch = upper.match(/\b([A-Z]{2,5}(?:-USD)?|[0-9]{4}\.HK)\b/);
-  const ticker = tickerMatch ? tickerMatch[0] : activeSymbol;
+  // 匹配: AAPL, BTC-USD, 0700.HK, 2399.HK, 港股2399 等
+  let ticker = null;
+  
+  // 明确的股票代码格式
+  const usMatch = upper.match(/\b([A-Z]{1,5})(?:-USD)?\b/);
+  const hkMatch = upper.match(/\b(\d{4,5})\.?HK\b/i);
+  const hkMatch2 = text.match(/港股\s*(\d{4,5})/);
+  const cryptoMatch = upper.match(/\b(BTC|ETH|SOL|BNB|XRP|ADA|DOGE|DOT)(?:-USD)?\b/);
+  
+  if (hkMatch) {
+    ticker = hkMatch[1] + '.HK';
+  } else if (hkMatch2) {
+    ticker = hkMatch2[1] + '.HK';
+  } else if (cryptoMatch) {
+    ticker = cryptoMatch[1] + '-USD';
+  } else if (usMatch && usMatch[1].length >= 2 && usMatch[1].length <= 5) {
+    // 检查是否是常见词而非股票代码
+    const commonWords = ['THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL', 'CAN', 'HAD', 'HER', 'WAS', 'ONE', 'OUR', 'OUT'];
+    if (!commonWords.includes(usMatch[1])) {
+      ticker = usMatch[1];
+    }
+  }
 
   const loadingEl = appendMsg('ai', '<span class="msg-loading">🤖 思考中...</span>', true);
 
   try {
-    // 热点扫描
-    if (/热点|hot|trending/i.test(text)) {
+    // 热点扫描 - 明确的命令
+    if (/^(热点|扫描热点|hot|trending)$/i.test(text.trim())) {
       loadingEl.innerHTML = '正在扫描热点资产...';
       const r = await fetch('/api/hot');
       const data = await r.json();
@@ -629,8 +660,8 @@ async function sendChat() {
         ? `🔥 <b>今日热点</b><br><br>${items.slice(0,6).map(i => `• ${i.symbol || i.name}: ${i.reason || ''}`).join('<br>')}`
         : '暂无热点数据，请稍后重试。';
     } 
-    // 股票分析
-    else if (ticker && (/分析|analyze|看|怎么|如何|评|研究/i.test(text) || tickerMatch)) {
+    // 明确的股票分析命令 (必须同时有股票代码和分析关键词)
+    else if (ticker && /^(分析|查|看看|研究)\s*.{0,10}$/i.test(text.replace(ticker, '').replace(/港股|美股|加密/g, ''))) {
       loadingEl.innerHTML = `🤖 正在分析 <b>${ticker}</b>，请稍候...`;
       const [priceR, analyzeR] = await Promise.all([
         fetch(`/api/price/${ticker}`),
@@ -638,38 +669,80 @@ async function sendChat() {
       ]);
       const priceData = await priceR.json();
       const analyzeData = await analyzeR.json();
-      const result = analyzeData[0] || analyzeData;
-      const score = result.total_score || result.score;
-      const rec = result.recommendation || result.signal || 'HOLD';
-      const recColor = rec === 'BUY' ? '#3fb950' : rec === 'SELL' ? '#f85149' : '#e3b341';
-      const chg = priceData.change_pct;
-      const sign = chg >= 0 ? '+' : '';
+      
+      if (priceData.error) {
+        // 如果查不到价格，让 AI 回答
+        const r = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text })
+        });
+        const data = await r.json();
+        loadingEl.innerHTML = data.reply ? data.reply.replace(/\n/g, '<br>') : '暂无回复';
+      } else {
+        const result = analyzeData[0] || analyzeData;
+        const score = result.total_score || result.score;
+        const rec = result.recommendation || result.signal || 'HOLD';
+        const recColor = rec === 'BUY' ? '#3fb950' : rec === 'SELL' ? '#f85149' : '#e3b341';
+        const chg = priceData.change_pct;
+        const sign = chg >= 0 ? '+' : '';
 
-      loadingEl.innerHTML = `
-        <b>${ticker}</b> — ${priceData.name || ''}<br>
-        价格: <b>${priceData.price?.toFixed(2) || '--'}</b> &nbsp;
-        涨跌: <span style="color:${chg>=0?'#3fb950':'#f85149'}">${sign}${chg?.toFixed(2)}%</span><br><br>
-        AI评分: <b style="color:${recColor}">${score !== undefined ? (score*100).toFixed(0) : '--'} / 100</b><br>
-        建议: <b style="color:${recColor}">${rec}</b><br>
-        ${result.ai_summary ? `<br>${result.ai_summary}` : ''}
-      `;
-
-      // 同时更新图表
-      selectSymbol(ticker);
+        loadingEl.innerHTML = `
+          <b>${ticker}</b> — ${priceData.name || ''}<br>
+          价格: <b>${priceData.price?.toFixed(2) || '--'}</b> &nbsp;
+          涨跌: <span style="color:${chg>=0?'#3fb950':'#f85149'}">${sign}${chg?.toFixed(2)}%</span><br><br>
+          AI评分: <b style="color:${recColor}">${score !== undefined ? (score*100).toFixed(0) : '--'} / 100</b><br>
+          建议: <b style="color:${recColor}">${rec}</b><br>
+          ${result.ai_summary ? `<br>${result.ai_summary}` : ''}
+        `;
+        // 同时更新图表
+        selectSymbol(ticker);
+      }
     } 
-    // 通用对话 - 调用 OpenClaw AI
+    // 其他所有消息 - 交给 AI 处理
     else {
-      loadingEl.innerHTML = '🤖 正在连接 OpenClaw AI...';
-      const r = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text })
-      });
-      const data = await r.json();
-      loadingEl.innerHTML = data.reply ? data.reply.replace(/\n/g, '<br>') : '暂无回复';
+      loadingEl.innerHTML = '🤖 龙虾交易助手思考中... <span id="chat-timer">(0s)</span>';
+      
+      // 添加超时计时器
+      let seconds = 0;
+      const timerEl = loadingEl.querySelector('#chat-timer');
+      const timerInterval = setInterval(() => {
+        seconds++;
+        if (timerEl) timerEl.textContent = `(${seconds}s)`;
+        // 8秒后显示提示
+        if (seconds === 8) {
+          loadingEl.innerHTML += '<br><span style="color:var(--muted);font-size:11px;">💡 系统繁忙，建议用快捷命令：分析 AAPL / 查询 BTC</span>';
+        }
+      }, 1000);
+      
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000); // 20秒前端超时
+        
+        const r = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, context: { activeSymbol, ticker } }),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        clearInterval(timerInterval);
+        
+        if (!r.ok) throw new Error('Network error');
+        const data = await r.json();
+        loadingEl.innerHTML = data.reply ? data.reply.replace(/\n/g, '<br>') : '暂无回复';
+      } catch (err) {
+        clearInterval(timerInterval);
+        if (err.name === 'AbortError') {
+          loadingEl.innerHTML = '⏳ 请求超时<br><br>💡 试试快捷命令：<br>• 分析 AAPL<br>• 查询 BTC价格<br>• 扫描热点';
+        } else {
+          loadingEl.innerHTML = '⚠️ 连接不稳定<br><br>💡 请刷新页面重试，或使用左侧快捷操作';
+        }
+      }
     }
   } catch(e) {
-    loadingEl.innerHTML = '请求失败，请检查服务连接。';
+    loadingEl.innerHTML = '⚠️ 请求失败<br><br>💡 请检查网络连接，或刷新页面重试';
   }
 
   scrollChat();
