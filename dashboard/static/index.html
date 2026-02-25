@@ -1,841 +1,999 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🚦 OpenClaw Trading OS</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenClaw Trading OS</title>
   <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
     :root {
-      --bg:       #0d1117;
-      --surface:  #161b22;
-      --border:   #30363d;
-      --text:     #e6edf3;
-      --muted:    #8b949e;
-      --green:    #3fb950;
-      --red:      #f85149;
-      --blue:     #58a6ff;
-      --yellow:   #e3b341;
-      --accent:   #1f6feb;
+      --bg: #0a1116;
+      --panel: #101b22;
+      --panel-2: #14232c;
+      --line: #243946;
+      --text: #e7f1f7;
+      --muted: #8aa0af;
+      --brand: #18c29c;
+      --brand-soft: rgba(24, 194, 156, 0.18);
+      --accent: #ff9f45;
+      --up: #20cf85;
+      --down: #ff5f67;
+      --warn: #ffd166;
+      --shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+      --radius: 14px;
     }
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',monospace; font-size:13px; height:100vh; overflow:hidden; }
 
-    /* ── 顶栏 ── */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'IBM Plex Sans', 'Space Grotesk', sans-serif;
+      background:
+        radial-gradient(1200px 700px at 8% -20%, rgba(24,194,156,0.22), transparent 60%),
+        radial-gradient(900px 500px at 98% -10%, rgba(255,159,69,0.16), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: 64px 1fr;
+      height: 100vh;
+    }
+
     .topbar {
-      height:48px; background:var(--surface); border-bottom:1px solid var(--border);
-      display:flex; align-items:center; padding:0 16px; gap:16px; flex-shrink:0;
+      border-bottom: 1px solid var(--line);
+      background: rgba(7, 14, 19, 0.8);
+      backdrop-filter: blur(10px);
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      align-items: center;
+      gap: 14px;
     }
-    .logo { font-size:16px; font-weight:700; color:var(--blue); white-space:nowrap; }
-    .search-wrap { display:flex; gap:6px; flex:1; max-width:400px; position:relative; }
-    .search-wrap input {
-      flex:1; background:#010409; border:1px solid var(--border); border-radius:6px;
-      color:var(--text); padding:6px 10px; font-size:13px; outline:none;
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      letter-spacing: .03em;
+      font-size: 16px;
     }
-    .search-wrap input:focus { border-color:var(--blue); }
-    
-    /* 搜索提示下拉框 */
-    .search-dropdown {
-      position:absolute; top:100%; left:0; right:60px; margin-top:4px;
-      background:var(--surface); border:1px solid var(--border); border-radius:8px;
-      box-shadow:0 8px 24px rgba(0,0,0,0.4); max-height:300px; overflow-y:auto;
-      display:none; z-index:1000;
+
+    .brand .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--brand);
+      box-shadow: 0 0 0 7px var(--brand-soft);
     }
-    .search-dropdown.show { display:block; }
-    .search-item {
-      display:flex; align-items:center; padding:10px 12px; cursor:pointer;
-      border-bottom:1px solid var(--border); gap:12px;
+
+    .status-cluster {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
-    .search-item:last-child { border-bottom:none; }
-    .search-item:hover { background:rgba(88,166,255,.1); }
-    .search-item .symbol { font-weight:700; font-size:14px; min-width:80px; }
-    .search-item .name { color:var(--muted); font-size:12px; flex:1; }
-    .search-item .market {
-      font-size:10px; padding:2px 6px; border-radius:4px;
-      background:var(--border); color:var(--muted);
-    }
-    .search-item .market.US { background:rgba(88,166,255,.2); color:var(--blue); }
-    .search-item .market.HK { background:rgba(248,81,73,.2); color:var(--red); }
-    .search-item .market.Crypto { background:rgba(227,179,65,.2); color:var(--yellow); }
-    .btn {
-      background:var(--accent); color:#fff; border:none; border-radius:6px;
-      padding:6px 12px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap;
-    }
-    .btn:hover { opacity:.85; }
-    .btn.ghost { background:transparent; border:1px solid var(--border); color:var(--text); }
-    .btn.ghost:hover { border-color:var(--blue); color:var(--blue); }
+
     .pill {
-      font-size:11px; padding:2px 8px; border-radius:20px; font-weight:600;
-      background:rgba(63,185,80,.15); color:var(--green);
-    }
-    .pill.red { background:rgba(248,81,73,.15); color:var(--red); }
-    .status-dot { width:8px; height:8px; border-radius:50%; background:var(--green); display:inline-block; margin-right:4px; animation:pulse 2s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
-
-    /* ── 主布局 ── */
-    .layout {
-      display:grid;
-      grid-template-columns: 220px 1fr 280px;
-      height: calc(100vh - 48px);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 11px;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 27, 34, 0.8);
     }
 
-    /* ── 左侧栏 ── */
-    .sidebar {
-      background:var(--surface); border-right:1px solid var(--border);
-      display:flex; flex-direction:column; overflow:hidden;
+    .pill .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--up);
     }
-    .sidebar-section { padding:12px; border-bottom:1px solid var(--border); }
-    .sidebar-title { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px; }
-    .watchlist-item {
-      display:flex; justify-content:space-between; align-items:center;
-      padding:7px 8px; border-radius:6px; cursor:pointer; margin-bottom:2px;
-      border:1px solid transparent; transition:all .15s;
+
+    .btn {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: linear-gradient(180deg, #1a2a34, #12202a);
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: .16s ease;
     }
-    .watchlist-item:hover { background:rgba(88,166,255,.08); border-color:rgba(88,166,255,.2); }
-    .watchlist-item.active { background:rgba(88,166,255,.12); border-color:rgba(88,166,255,.35); }
-    .wl-sym { font-weight:700; font-size:13px; }
-    .wl-price { font-size:12px; color:var(--text); }
-    .wl-chg { font-size:11px; font-weight:600; }
-    .wl-remove { color:var(--muted); font-size:14px; cursor:pointer; opacity:0; padding:0 4px; }
-    .watchlist-item:hover .wl-remove { opacity:1; }
-    .empty-msg { color:var(--muted); font-size:12px; text-align:center; padding:16px 0; }
 
-    .quick-btn { width:100%; margin-bottom:6px; text-align:left; padding:7px 10px; font-size:12px; }
-
-    /* ── 主内容 ── */
-    .main { display:flex; flex-direction:column; overflow:hidden; }
-    .chart-header {
-      padding:10px 16px; background:var(--surface); border-bottom:1px solid var(--border);
-      display:flex; align-items:center; gap:16px; flex-shrink:0;
+    .btn:hover { transform: translateY(-1px); border-color: #35657a; }
+    .btn.primary {
+      border-color: transparent;
+      background: linear-gradient(140deg, #18c29c, #0fa57f);
+      color: #072017;
+      font-weight: 700;
     }
-    .chart-sym { font-size:18px; font-weight:800; }
-    .chart-price { font-size:22px; font-weight:700; }
-    .chart-meta { color:var(--muted); font-size:12px; }
-    .period-btns { display:flex; gap:4px; margin-left:auto; }
-    .period-btn {
-      background:transparent; border:1px solid var(--border); color:var(--muted);
-      border-radius:4px; padding:3px 10px; cursor:pointer; font-size:12px;
+
+    .main {
+      display: grid;
+      grid-template-columns: 290px 1fr 360px;
+      gap: 14px;
+      padding: 14px;
+      min-height: 0;
     }
-    .period-btn.active, .period-btn:hover { border-color:var(--blue); color:var(--blue); }
 
-    #chart-container { flex:1; position:relative; }
-
-    /* ── 右侧栏 ── */
     .panel {
-      background:var(--surface); border-left:1px solid var(--border);
-      display:flex; flex-direction:column; overflow:hidden;
+      background: linear-gradient(180deg, rgba(20,35,44,.95), rgba(16,27,34,.95));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
-    .panel-tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
-    .panel-tab {
-      flex:1; padding:10px; text-align:center; cursor:pointer; color:var(--muted);
-      font-size:12px; font-weight:600; border-bottom:2px solid transparent;
+
+    .panel-header {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px;
+      letter-spacing: .02em;
     }
-    .panel-tab.active { color:var(--blue); border-bottom-color:var(--blue); }
-    .panel-body { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; }
 
-    /* AI Chat */
-    .chat-messages { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin-bottom:8px; min-height:0; }
-    .msg { padding:8px 10px; border-radius:8px; max-width:100%; font-size:12px; line-height:1.5; }
-    .msg.user { background:var(--accent); color:#fff; align-self:flex-end; border-radius:8px 8px 2px 8px; }
-    .msg.ai { background:#21262d; color:var(--text); align-self:flex-start; border-radius:8px 8px 8px 2px; }
-    .msg.ai b { color:var(--yellow); }
-    .msg.ai .score { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; }
-    .msg-loading { color:var(--muted); font-style:italic; }
-    .chat-input-wrap { display:flex; gap:6px; flex-shrink:0; }
-    .chat-input {
-      flex:1; background:#010409; border:1px solid var(--border); border-radius:6px;
-      color:var(--text); padding:8px 10px; font-size:12px; outline:none; resize:none; min-height:38px; max-height:80px;
+    .panel-body {
+      padding: 12px;
+      overflow: auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
-    .chat-input:focus { border-color:var(--blue); }
 
-    /* Analysis result */
-    .analysis-card { background:#21262d; border-radius:8px; padding:12px; margin-bottom:8px; }
-    .analysis-card h4 { font-size:12px; color:var(--blue); margin-bottom:8px; text-transform:uppercase; letter-spacing:.05em; }
-    .score-bar { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
-    .score-label { width:90px; font-size:11px; color:var(--muted); }
-    .score-track { flex:1; height:6px; background:#30363d; border-radius:3px; overflow:hidden; }
-    .score-fill { height:100%; border-radius:3px; transition:width .5s; }
-    .score-val { width:32px; font-size:11px; text-align:right; font-weight:700; }
+    .search {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
 
-    /* Agent feed */
-    .feed-item { padding:8px; border-left:2px solid var(--border); margin-bottom:6px; font-size:11px; }
-    .feed-item.critical { border-color:var(--red); }
-    .feed-item.info { border-color:var(--blue); }
-    .feed-item.success { border-color:var(--green); }
-    .feed-time { color:var(--muted); font-size:10px; }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #0c151b;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+      outline: none;
+    }
 
-    /* Scrollbar */
-    ::-webkit-scrollbar { width:4px; }
-    ::-webkit-scrollbar-track { background:transparent; }
-    ::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+    input:focus, select:focus, textarea:focus { border-color: #2f738e; }
+
+    .dropdown {
+      position: absolute;
+      top: 42px;
+      left: 0;
+      right: 84px;
+      max-height: 260px;
+      overflow: auto;
+      background: #0e1b23;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      display: none;
+      z-index: 10;
+    }
+
+    .dropdown.show { display: block; }
+
+    .drop-item {
+      padding: 8px 10px;
+      border-bottom: 1px solid #1d2e38;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .drop-item:hover { background: rgba(24,194,156,0.1); }
+
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .item {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      background: rgba(12, 21, 27, 0.75);
+    }
+
+    .item.active { border-color: #2b6d64; background: rgba(24,194,156,.09); }
+    .item small { color: var(--muted); }
+
+    .price-up { color: var(--up); font-weight: 600; }
+    .price-down { color: var(--down); font-weight: 600; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+    .chart-wrap {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 0;
+    }
+
+    .symbol-head {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .symbol-name { font-size: 22px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
+    .quote { font-size: 18px; }
+
+    #chart { min-height: 0; }
+
+    .periods { display: flex; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--line); }
+    .periods button { flex: 1; }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tab {
+      padding: 10px 8px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+
+    .tab.active { color: var(--text); border-bottom-color: var(--brand); background: rgba(24,194,156,.08); }
+
+    .tab-pane { display: none; height: 100%; overflow: auto; padding: 12px; }
+    .tab-pane.active { display: block; }
+
+    .chat-box {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(8, 15, 20, 0.7);
+      min-height: 180px;
+      max-height: 320px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .msg { padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45; }
+    .msg.user { background: #274150; align-self: flex-end; max-width: 88%; }
+    .msg.ai { background: #13232d; border: 1px solid #22404f; max-width: 95%; }
+
+    .meta-box {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(8, 15, 20, 0.7);
+    }
+
+    .row { display: flex; gap: 8px; align-items: center; }
+    .row > * { flex: 1; }
+
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .muted { color: var(--muted); }
+    .tiny { font-size: 11px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th, td {
+      border-bottom: 1px solid #1e313c;
+      text-align: left;
+      padding: 7px 5px;
+      white-space: nowrap;
+    }
+
+    .feed {
+      max-height: 170px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 8px;
+      background: rgba(8,15,20,.6);
+    }
+
+    .feed-item {
+      border-left: 2px solid var(--line);
+      padding-left: 8px;
+      margin-bottom: 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .feed-item.ok { border-color: var(--up); }
+    .feed-item.warn { border-color: var(--warn); }
+    .feed-item.err { border-color: var(--down); }
+
+    @media (max-width: 1180px) {
+      body { overflow: auto; }
+      .app { height: auto; min-height: 100vh; }
+      .main {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto;
+      }
+      .panel { min-height: 360px; }
+    }
   </style>
 </head>
 <body>
+  <div class="app">
+    <div class="topbar">
+      <div class="brand">
+        <span class="dot"></span>
+        <span>OPENCLAW TRADING OS</span>
+      </div>
+      <div class="status-cluster" id="status-cluster">
+        <span class="pill"><span class="live-dot"></span><span id="health-text">Health: checking</span></span>
+        <span class="pill" id="mode-pill">Mode: --</span>
+        <span class="pill" id="kill-pill">Kill: --</span>
+      </div>
+      <button class="btn" onclick="loadAllData()">Refresh</button>
+    </div>
 
-<!-- ── 顶栏 ── -->
-<div class="topbar">
-  <div class="logo">🚦 Trading OS</div>
-  <div class="search-wrap">
-    <input id="search-input" type="text" placeholder="搜索股票 (AAPL, 腾讯, BTC...)" autocomplete="off" />
-    <button class="btn" onclick="addSymbol()">+ 添加</button>
-    <div class="search-dropdown" id="search-dropdown"></div>
+    <div class="main">
+      <section class="panel">
+        <div class="panel-header">
+          <span>Market & Execution</span>
+          <span class="tiny muted mono" id="left-ts">--</span>
+        </div>
+        <div class="panel-body">
+          <div class="search">
+            <input id="search-input" placeholder="搜索标的: AAPL / 0700.HK / BTC-USD" autocomplete="off" />
+            <button class="btn primary" onclick="addSymbol()">Add</button>
+            <div class="dropdown" id="search-dropdown"></div>
+          </div>
+
+          <div class="meta-box">
+            <div class="row" style="margin-bottom:8px">
+              <button class="btn" onclick="loadWatchlist()">Reload Watchlist</button>
+              <button class="btn" onclick="addDemo()">Load Demo</button>
+            </div>
+            <div class="list" id="watchlist"></div>
+          </div>
+
+          <div class="meta-box">
+            <div class="row" style="margin-bottom:8px">
+              <select id="exec-mode">
+                <option value="PAPER">PAPER</option>
+                <option value="LIVE">LIVE</option>
+              </select>
+              <select id="exec-kill">
+                <option value="off">Kill Switch Off</option>
+                <option value="on">Kill Switch On</option>
+              </select>
+              <button class="btn" onclick="saveExecConfig()">Apply</button>
+            </div>
+            <div class="tiny muted">执行入口统一走 <span class="mono">/api/orders/execute</span>，会先经过风控和熔断。</div>
+          </div>
+
+          <div class="meta-box">
+            <div class="grid-3" style="margin-bottom:8px">
+              <input id="order-symbol" placeholder="Symbol" />
+              <select id="order-side"><option>BUY</option><option>SELL</option></select>
+              <select id="order-type"><option>MARKET</option><option>LIMIT</option></select>
+            </div>
+            <div class="grid-3" style="margin-bottom:8px">
+              <input id="order-qty" type="number" step="0.0001" placeholder="Qty" />
+              <input id="order-limit" type="number" step="0.0001" placeholder="Limit Price" />
+              <button class="btn primary" onclick="placeOrder()">Execute</button>
+            </div>
+            <div class="tiny muted" id="order-result">等待下单</div>
+          </div>
+
+          <div class="feed" id="feed"></div>
+        </div>
+      </section>
+
+      <section class="panel chart-wrap">
+        <div class="symbol-head">
+          <div>
+            <div class="symbol-name" id="symbol-name">AAPL</div>
+            <div class="tiny muted" id="symbol-desc">--</div>
+          </div>
+          <div style="text-align:right">
+            <div class="quote mono" id="symbol-price">--</div>
+            <div class="tiny" id="symbol-change">--</div>
+          </div>
+        </div>
+        <div id="chart"></div>
+        <div class="periods">
+          <button class="btn" onclick="changePeriod('1d', this)">1D</button>
+          <button class="btn" onclick="changePeriod('5d', this)">5D</button>
+          <button class="btn" onclick="changePeriod('1mo', this)">1M</button>
+          <button class="btn" onclick="changePeriod('3mo', this)">3M</button>
+          <button class="btn" onclick="changePeriod('6mo', this)">6M</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="tabs">
+          <div class="tab active" data-tab="chat" onclick="switchTab(this)">Agent</div>
+          <div class="tab" data-tab="strategies" onclick="switchTab(this)">Strategies</div>
+          <div class="tab" data-tab="risk" onclick="switchTab(this)">Risk</div>
+          <div class="tab" data-tab="activity" onclick="switchTab(this)">Activity</div>
+        </div>
+
+        <div class="tab-pane active" id="tab-chat">
+          <div class="meta-box" style="margin-bottom:10px">
+            <div class="grid-2" style="margin-bottom:8px">
+              <input id="agent-name" placeholder="Agent Name" />
+              <select id="agent-mode">
+                <option value="advisor">advisor</option>
+                <option value="semi_auto">semi_auto</option>
+                <option value="auto">auto</option>
+              </select>
+              <select id="agent-style">
+                <option value="concise">concise</option>
+                <option value="standard">standard</option>
+                <option value="deep">deep</option>
+              </select>
+              <select id="agent-risk">
+                <option value="conservative">conservative</option>
+                <option value="balanced">balanced</option>
+                <option value="aggressive">aggressive</option>
+              </select>
+            </div>
+            <div class="grid-2" style="margin-bottom:8px">
+              <label class="tiny muted"><input type="checkbox" id="cap-market" /> market_brief</label>
+              <label class="tiny muted"><input type="checkbox" id="cap-tech" /> technical_analysis</label>
+              <label class="tiny muted"><input type="checkbox" id="cap-news" /> news_reasoning</label>
+              <label class="tiny muted"><input type="checkbox" id="cap-portfolio" /> portfolio_review</label>
+              <label class="tiny muted"><input type="checkbox" id="cap-risk" /> risk_guard</label>
+              <label class="tiny muted"><input type="checkbox" id="cap-exec" /> execution_plan</label>
+            </div>
+            <div class="row">
+              <button class="btn" onclick="loadAgentConfig()">Load</button>
+              <button class="btn primary" onclick="saveAgentConfig()">Save Agent Config</button>
+            </div>
+          </div>
+
+          <div class="chat-box" id="chat-box"></div>
+          <div class="row" style="margin-top:8px">
+            <textarea id="chat-input" rows="2" placeholder="输入你的交易问题，例如：分析 AAPL 并给出今天可执行计划"></textarea>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button class="btn primary" onclick="sendChat()">Send</button>
+            <button class="btn" onclick="quickAsk('给我当前持仓风险复盘')">Risk Review</button>
+            <button class="btn" onclick="quickAsk('给我今天3条可执行交易计划')">Action Plan</button>
+          </div>
+        </div>
+
+        <div class="tab-pane" id="tab-strategies">
+          <div class="meta-box" style="margin-bottom:10px">
+            <div class="grid-2" style="margin-bottom:8px">
+              <input id="st-name" placeholder="Strategy name" />
+              <input id="st-symbol" placeholder="Symbol" />
+              <select id="st-market"><option>US</option><option>HK</option><option>Crypto</option></select>
+              <input id="st-timeframe" placeholder="Timeframe (1d/4h)" value="1d" />
+            </div>
+            <button class="btn primary" onclick="createStrategy()">Create Strategy</button>
+          </div>
+          <div id="strategies-list"></div>
+        </div>
+
+        <div class="tab-pane" id="tab-risk">
+          <div class="meta-box" style="margin-bottom:10px">
+            <div class="grid-2" style="margin-bottom:8px">
+              <select id="rule-type">
+                <option value="max_order_notional_usd">max_order_notional_usd</option>
+                <option value="max_orders_per_day">max_orders_per_day</option>
+                <option value="max_position_value_usd">max_position_value_usd</option>
+                <option value="allowed_symbols">allowed_symbols</option>
+              </select>
+              <input id="rule-name" placeholder="Rule name" />
+            </div>
+            <textarea id="rule-json" rows="3" class="mono" placeholder='{"usd": 5000}'></textarea>
+            <button class="btn primary" style="margin-top:8px" onclick="createRule()">Create Rule</button>
+          </div>
+          <div id="risk-list"></div>
+        </div>
+
+        <div class="tab-pane" id="tab-activity">
+          <div class="meta-box" style="margin-bottom:10px">
+            <button class="btn" onclick="loadOrdersPositionsRuns()">Reload Activity</button>
+          </div>
+          <div class="meta-box" style="margin-bottom:8px">
+            <div class="tiny muted" style="margin-bottom:6px">Orders</div>
+            <div id="orders-table"></div>
+          </div>
+          <div class="meta-box" style="margin-bottom:8px">
+            <div class="tiny muted" style="margin-bottom:6px">Positions</div>
+            <div id="positions-table"></div>
+          </div>
+          <div class="meta-box">
+            <div class="tiny muted" style="margin-bottom:6px">Agent Runs</div>
+            <div id="runs-table"></div>
+          </div>
+        </div>
+      </section>
+    </div>
   </div>
-  <span style="color:var(--muted);font-size:12px;"><span class="status-dot"></span>实时</span>
-</div>
 
-<!-- ── 主布局 ── -->
-<div class="layout">
+  <script>
+    const state = {
+      activeSymbol: 'AAPL',
+      prices: {},
+      period: '1d',
+      ws: null,
+      chart: null,
+      candle: null,
+    };
 
-  <!-- 左侧：自选股 + 快捷操作 -->
-  <div class="sidebar">
-    <div class="sidebar-section" style="flex:1;overflow-y:auto;min-height:0">
-      <div class="sidebar-title">自选股</div>
-      <div id="watchlist-container">
-        <div class="empty-msg">输入代码后点击「+ 添加」</div>
-      </div>
-    </div>
-    <div class="sidebar-section">
-      <div class="sidebar-title">快捷操作</div>
-      <button class="btn ghost quick-btn" onclick="loadHot()">🔥 热点扫描</button>
-      <button class="btn ghost quick-btn" onclick="analyzeActive()">🤖 AI 分析</button>
-      <button class="btn ghost quick-btn" onclick="addDemo()">📋 加载示例</button>
-    </div>
-  </div>
-
-  <!-- 主区：图表 -->
-  <div class="main">
-    <div class="chart-header">
-      <div>
-        <span class="chart-sym" id="chart-sym">--</span>
-        <span class="chart-meta" id="chart-name" style="margin-left:8px"></span>
-      </div>
-      <div>
-        <span class="chart-price" id="chart-price">--</span>
-        <span id="chart-chg" style="margin-left:8px;font-size:14px;font-weight:600"></span>
-      </div>
-      <div class="period-btns">
-        <button class="period-btn active" onclick="changePeriod('1d',this)">1D</button>
-        <button class="period-btn" onclick="changePeriod('5d',this)">5D</button>
-        <button class="period-btn" onclick="changePeriod('1mo',this)">1M</button>
-        <button class="period-btn" onclick="changePeriod('3mo',this)">3M</button>
-      </div>
-    </div>
-    <div id="chart-container"></div>
-  </div>
-
-  <!-- 右侧：AI 面板 -->
-  <div class="panel">
-    <div class="panel-tabs">
-      <div class="panel-tab active" onclick="switchTab('chat',this)">🤖 AI 助手</div>
-      <div class="panel-tab" onclick="switchTab('analysis',this)">📊 分析</div>
-      <div class="panel-tab" onclick="switchTab('feed',this)">📡 动态</div>
-    </div>
-
-    <!-- Chat Tab -->
-    <div class="panel-body" id="tab-chat">
-      <!-- OpenClaw 快捷入口 -->
-      <div style="padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:8px;display:flex;gap:8px;align-items:center;">
-        <button class="btn" onclick="window.open('http://127.0.0.1:18789/','_blank')" style="flex:1;">
-          🦞 打开 OpenClaw 完整版
-        </button>
-        <span style="font-size:11px;color:var(--muted);">全部工具</span>
-      </div>
-      
-      <!-- 内置 AI 聊天 -->
-      <div class="chat-messages" id="chat-messages">
-        <div class="msg ai">
-          🦞 <b>龙虾交易助手</b> 已上线！<br><br>
-          我是横跨 <b>港股🇭🇰 美股🇺🇸 Crypto🪙</b> 的多边形交易战士，也是 <b>MuQuant</b> 量化系统的搭建者。<br><br>
-          <b>🔥 常用指令：</b><br>
-          • <code>分析 AAPL</code> — 技术面+基本面分析<br>
-          • <code>搜索 腾讯财报</code> — 实时资讯抓取<br>
-          • <code>BTC价格</code> — 加密货币行情<br>
-          • <code>热点</code> — 扫描市场热点<br>
-          • <code>预警 AAPL 200</code> — 价格提醒<br><br>
-          <span style="color:var(--muted);font-size:11px;">💡 直接输入问题，我随时为你分析！</span>
-        </div>
-      </div>
-      <div class="chat-input-wrap">
-        <textarea class="chat-input" id="chat-input" placeholder="问 AI 助手..." rows="1"
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"
-        ></textarea>
-        <button class="btn" onclick="sendChat()">发送</button>
-      </div>
-    </div>
-
-    <!-- Analysis Tab -->
-    <div class="panel-body" id="tab-analysis" style="display:none">
-      <div id="analysis-content">
-        <div class="empty-msg" style="margin-top:24px">选择标的后点击「🤖 AI 分析」</div>
-      </div>
-    </div>
-
-    <!-- Feed Tab -->
-    <div class="panel-body" id="tab-feed" style="display:none">
-      <div id="feed-content">
-        <div class="feed-item info">
-          <div class="feed-time">启动中</div>
-          OpenClaw Trading OS 已连接
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-// ── 状态 ─────────────────────────────────────────────────────────
-let activeSymbol = '';
-let chart = null;
-let candleSeries = null;
-let volSeries = null;
-let currentPeriod = '1d';
-let ws = null;
-let prices = {}; // {symbol: priceData}
-
-// ── 图表初始化 ───────────────────────────────────────────────────
-function initChart() {
-  const container = document.getElementById('chart-container');
-  chart = LightweightCharts.createChart(container, {
-    layout: { background: { color: '#0d1117' }, textColor: '#8b949e' },
-    grid: { vertLines: { color: '#1c2128' }, horzLines: { color: '#1c2128' } },
-    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-    rightPriceScale: { borderColor: '#30363d' },
-    timeScale: { borderColor: '#30363d', timeVisible: true },
-    width: container.offsetWidth,
-    height: container.offsetHeight,
-  });
-
-  candleSeries = chart.addCandlestickSeries({
-    upColor: '#3fb950', downColor: '#f85149',
-    borderUpColor: '#3fb950', borderDownColor: '#f85149',
-    wickUpColor: '#3fb950', wickDownColor: '#f85149',
-  });
-
-  window.addEventListener('resize', () => {
-    chart.resize(container.offsetWidth, container.offsetHeight);
-  });
-}
-
-// ── 加载图表数据 ─────────────────────────────────────────────────
-async function loadChart(symbol, period) {
-  if (!symbol) return;
-  try {
-    const r = await fetch(`/api/chart/${symbol}?period=${period}`);
-    const data = await r.json();
-    if (!data.data || !data.data.length) return;
-
-    const candles = data.data.map(d => ({
-      time: Math.floor(new Date(d.date).getTime() / 1000),
-      open: d.open, high: d.high, low: d.low, close: d.close,
-    })).filter(d => d.open && d.high && d.low && d.close)
-       .sort((a, b) => a.time - b.time);
-
-    if (candles.length) {
-      candleSeries.setData(candles);
-      chart.timeScale().fitContent();
+    function logFeed(text, level = 'ok') {
+      const el = document.getElementById('feed');
+      const d = document.createElement('div');
+      d.className = `feed-item ${level}`;
+      const ts = new Date().toLocaleTimeString();
+      d.innerHTML = `<div class="mono tiny">${ts}</div><div>${text}</div>`;
+      el.prepend(d);
+      while (el.children.length > 60) el.removeChild(el.lastChild);
     }
-  } catch(e) { console.error('Chart load error:', e); }
-}
 
-// ── 加载价格 ─────────────────────────────────────────────────────
-async function loadPrice(symbol) {
-  try {
-    const r = await fetch(`/api/price/${symbol}`);
-    const d = await r.json();
-    if (d.error) return;
-    prices[symbol] = d;
-    if (symbol === activeSymbol) updateHeader(d);
-    return d;
-  } catch(e) {}
-}
-
-function updateHeader(d) {
-  document.getElementById('chart-sym').textContent = d.symbol || '';
-  document.getElementById('chart-name').textContent = d.name || '';
-  const price = d.price ? d.price.toFixed(d.price > 100 ? 2 : 4) : '--';
-  document.getElementById('chart-price').textContent = `${d.currency || ''} ${price}`;
-  const chg = d.change_pct;
-  const chgEl = document.getElementById('chart-chg');
-  if (chg !== undefined) {
-    const sign = chg >= 0 ? '+' : '';
-    chgEl.textContent = `${sign}${chg.toFixed(2)}%`;
-    chgEl.style.color = chg >= 0 ? 'var(--green)' : 'var(--red)';
-  }
-}
-
-// ── 自选股 ───────────────────────────────────────────────────────
-async function loadWatchlist() {
-  try {
-    const r = await fetch('/api/watchlist');
-    const items = await r.json();
-    renderWatchlist(items);
-    // 如果自选股为空，设置默认展示 AAPL
-    if (items.length === 0 && !activeSymbol) {
-      selectSymbol('AAPL');
-    } else if (items.length > 0 && !activeSymbol) {
-      selectSymbol(items[0].symbol);
+    async function api(path, options = {}) {
+      const r = await fetch(path, options);
+      if (!r.ok) throw new Error(`${path} -> ${r.status}`);
+      return await r.json();
     }
-  } catch(e) {}
-}
 
-function renderWatchlist(items) {
-  const container = document.getElementById('watchlist-container');
-  if (!items.length) {
-    container.innerHTML = '<div class="empty-msg">输入代码后点击「+ 添加」</div>';
-    return;
-  }
-  container.innerHTML = items.map(item => {
-    const chg = item.change_pct;
-    const sign = chg >= 0 ? '+' : '';
-    const cls = chg >= 0 ? 'var(--green)' : 'var(--red)';
-    const price = item.price ? item.price.toFixed(item.price > 100 ? 2 : 4) : '--';
-    return `
-      <div class="watchlist-item ${item.symbol === activeSymbol ? 'active' : ''}"
-           onclick="selectSymbol('${item.symbol}')" id="wl-${item.symbol}">
-        <div>
-          <div class="wl-sym">${item.symbol}</div>
-          <div style="font-size:10px;color:var(--muted)">${item.name || ''}</div>
-        </div>
-        <div style="text-align:right">
-          <div class="wl-price">${price}</div>
-          <div class="wl-chg" style="color:${cls}">${sign}${chg !== undefined ? chg.toFixed(2) : '--'}%</div>
-        </div>
-        <span class="wl-remove" onclick="event.stopPropagation();removeSymbol('${item.symbol}')">×</span>
-      </div>`;
-  }).join('');
-}
-
-async function selectSymbol(symbol) {
-  activeSymbol = symbol;
-  // 更新 active 样式
-  document.querySelectorAll('.watchlist-item').forEach(el => el.classList.remove('active'));
-  const el = document.getElementById(`wl-${symbol}`);
-  if (el) el.classList.add('active');
-  // 加载价格 + 图表
-  await Promise.all([loadPrice(symbol), loadChart(symbol, currentPeriod)]);
-}
-
-// ── 搜索提示功能 ─────────────────────────────────────────────
-let searchTimeout = null;
-const searchInput = document.getElementById('search-input');
-const searchDropdown = document.getElementById('search-dropdown');
-
-searchInput.addEventListener('input', (e) => {
-  const q = e.target.value.trim();
-  clearTimeout(searchTimeout);
-  
-  if (q.length < 1) {
-    searchDropdown.classList.remove('show');
-    return;
-  }
-  
-  searchTimeout = setTimeout(() => doSearch(q), 150);
-});
-
-searchInput.addEventListener('focus', () => {
-  const q = searchInput.value.trim();
-  if (q.length >= 1) doSearch(q);
-});
-
-searchInput.addEventListener('blur', () => {
-  // 延迟隐藏，让点击事件先触发
-  setTimeout(() => searchDropdown.classList.remove('show'), 200);
-});
-
-async function doSearch(q) {
-  try {
-    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-    const items = await r.json();
-    
-    if (!items.length) {
-      // 没有匹配结果，但如果输入看起来是有效代码，显示提示
-      if (q.length >= 2) {
-        searchDropdown.innerHTML = `
-          <div class="search-item" onclick="selectSearchItem('${q.toUpperCase()}')">
-            <span class="symbol">${q.toUpperCase()}</span>
-            <span class="name">按回车添加此代码</span>
-          </div>`;
-        searchDropdown.classList.add('show');
-      } else {
-        searchDropdown.classList.remove('show');
-      }
-      return;
-    }
-    
-    searchDropdown.innerHTML = items.map(item => `
-      <div class="search-item" onclick="selectSearchItem('${item.symbol}')">
-        <span class="symbol">${item.symbol}</span>
-        <span class="name">${item.name}</span>
-        <span class="market ${item.market}">${item.market}</span>
-      </div>
-    `).join('');
-    searchDropdown.classList.add('show');
-  } catch(e) {
-    console.error('Search error:', e);
-  }
-}
-
-function selectSearchItem(symbol) {
-  searchInput.value = symbol;
-  searchDropdown.classList.remove('show');
-  addSymbol();
-}
-
-async function addSymbol() {
-  const input = document.getElementById('search-input');
-  const sym = input.value.trim().toUpperCase();
-  if (!sym) return;
-  
-  searchDropdown.classList.remove('show');
-  addFeedItem('info', `正在添加 ${sym}...`);
-  
-  try {
-    const r = await fetch(`/api/watchlist/${sym}`, { method: 'POST' });
-    const data = await r.json();
-    if (data.success) {
-      input.value = '';
-      addFeedItem('success', `✅ ${sym} 已加入自选股`);
-      await loadWatchlist();
-      selectSymbol(sym);
-    } else {
-      addFeedItem('critical', `❌ ${data.message}`);
-    }
-  } catch(e) {
-    addFeedItem('critical', `❌ 添加失败: ${e.message}`);
-  }
-}
-
-async function removeSymbol(symbol) {
-  await fetch(`/api/watchlist/${symbol}`, { method: 'DELETE' });
-  addFeedItem('info', `移除 ${symbol}`);
-  if (activeSymbol === symbol) activeSymbol = '';
-  await loadWatchlist();
-}
-
-async function changePeriod(period, btn) {
-  document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  currentPeriod = period;
-  if (activeSymbol) await loadChart(activeSymbol, period);
-}
-
-// ── 快捷操作 ─────────────────────────────────────────────────────
-async function analyzeActive() {
-  const sym = activeSymbol || 'AAPL';
-  switchTab('analysis', document.querySelectorAll('.panel-tab')[1]);
-  document.getElementById('analysis-content').innerHTML = '<div class="empty-msg msg-loading">分析中... ⏳</div>';
-  addFeedItem('info', `🤖 正在分析 ${sym}...`);
-  try {
-    const r = await fetch(`/api/analyze/${sym}`);
-    const data = await r.json();
-    renderAnalysis(sym, data);
-    addFeedItem('success', `✅ ${sym} 分析完成`);
-  } catch(e) {
-    document.getElementById('analysis-content').innerHTML = '<div class="empty-msg">分析失败，请重试</div>';
-  }
-}
-
-function renderAnalysis(symbol, data) {
-  if (data.error) {
-    document.getElementById('analysis-content').innerHTML = `<div class="empty-msg">${data.error}</div>`;
-    return;
-  }
-
-  // 尝试从返回数据提取评分
-  const result = data[0] || data;
-  const score = result.total_score || result.score || 0;
-  const rec = result.recommendation || result.signal || 'HOLD';
-  const dims = result.dimensions || result.scores || {};
-
-  const recColor = rec === 'BUY' ? 'var(--green)' : rec === 'SELL' ? 'var(--red)' : 'var(--yellow)';
-
-  const dimLabels = {
-    earnings_surprise: '财报惊喜',
-    fundamentals: '基本面',
-    analyst_sentiment: '分析师',
-    market_context: '市场环境',
-    momentum: '动量',
-    sector_relative: '板块',
-    historical: '历史',
-    sentiment: '情绪',
-  };
-
-  const dimHtml = Object.entries(dims).map(([key, val]) => {
-    const pct = Math.min(100, Math.max(0, (val + 1) / 2 * 100)); // 归一化 -1~1 → 0~100
-    const color = val >= 0 ? 'var(--green)' : 'var(--red)';
-    return `
-      <div class="score-bar">
-        <div class="score-label">${dimLabels[key] || key}</div>
-        <div class="score-track"><div class="score-fill" style="width:${pct}%;background:${color}"></div></div>
-        <div class="score-val" style="color:${color}">${(val * 100).toFixed(0)}</div>
-      </div>`;
-  }).join('');
-
-  document.getElementById('analysis-content').innerHTML = `
-    <div class="analysis-card">
-      <h4>${symbol} 综合评分</h4>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-        <div style="font-size:28px;font-weight:800;color:${recColor}">${(score * 100).toFixed(0)}</div>
-        <div>
-          <div style="font-size:16px;font-weight:700;color:${recColor}">${rec}</div>
-          <div style="font-size:11px;color:var(--muted)">综合建议</div>
-        </div>
-      </div>
-      ${dimHtml || '<div style="color:var(--muted);font-size:12px">详细评分不可用</div>'}
-    </div>
-    ${result.ai_summary ? `<div class="analysis-card"><h4>AI 解读</h4><div style="font-size:12px;line-height:1.6;color:var(--text)">${result.ai_summary}</div></div>` : ''}
-    <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:8px">⚠️ 仅供参考，不构成投资建议</div>
-  `;
-}
-
-async function loadHot() {
-  addFeedItem('info', '🔥 正在扫描热点...');
-  switchTab('feed', document.querySelectorAll('.panel-tab')[2]);
-  try {
-    const r = await fetch('/api/hot');
-    const data = await r.json();
-    if (data.trending) {
-      data.trending.slice(0, 8).forEach(item => {
-        addFeedItem('success', `🔥 ${item.symbol || item.name} — ${item.reason || '热门'}`);
+    function initChart() {
+      const container = document.getElementById('chart');
+      state.chart = LightweightCharts.createChart(container, {
+        layout: { background: { color: '#0f1b22' }, textColor: '#8aa0af' },
+        grid: { vertLines: { color: '#1a2a34' }, horzLines: { color: '#1a2a34' } },
+        rightPriceScale: { borderColor: '#274252' },
+        timeScale: { borderColor: '#274252', timeVisible: true },
+        width: container.clientWidth,
+        height: container.clientHeight,
       });
-    } else if (data.error) {
-      addFeedItem('critical', `热点扫描: ${data.error}`);
+
+      state.candle = state.chart.addCandlestickSeries({
+        upColor: '#20cf85',
+        downColor: '#ff5f67',
+        wickUpColor: '#20cf85',
+        wickDownColor: '#ff5f67',
+        borderVisible: false,
+      });
+
+      window.addEventListener('resize', () => {
+        state.chart.resize(container.clientWidth, container.clientHeight);
+      });
     }
-  } catch(e) { addFeedItem('critical', '热点扫描失败'); }
-}
 
-async function addDemo() {
-  const demos = ['AAPL', 'NVDA', 'BTC-USD'];
-  for (const sym of demos) {
-    await fetch(`/api/watchlist/${sym}`, { method: 'POST' });
-  }
-  await loadWatchlist();
-  addFeedItem('success', '✅ 示例标的已加载');
-}
-
-// ── AI Chat ──────────────────────────────────────────────────────
-async function sendChat() {
-  const input = document.getElementById('chat-input');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-
-  appendMsg('user', text);
-
-  // 解析股票代码 - 更智能的匹配
-  const upper = text.toUpperCase();
-  // 匹配: AAPL, BTC-USD, 0700.HK, 2399.HK, 港股2399 等
-  let ticker = null;
-  
-  // 明确的股票代码格式
-  const usMatch = upper.match(/\b([A-Z]{1,5})(?:-USD)?\b/);
-  const hkMatch = upper.match(/\b(\d{4,5})\.?HK\b/i);
-  const hkMatch2 = text.match(/港股\s*(\d{4,5})/);
-  const cryptoMatch = upper.match(/\b(BTC|ETH|SOL|BNB|XRP|ADA|DOGE|DOT)(?:-USD)?\b/);
-  
-  if (hkMatch) {
-    ticker = hkMatch[1] + '.HK';
-  } else if (hkMatch2) {
-    ticker = hkMatch2[1] + '.HK';
-  } else if (cryptoMatch) {
-    ticker = cryptoMatch[1] + '-USD';
-  } else if (usMatch && usMatch[1].length >= 2 && usMatch[1].length <= 5) {
-    // 检查是否是常见词而非股票代码
-    const commonWords = ['THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL', 'CAN', 'HAD', 'HER', 'WAS', 'ONE', 'OUR', 'OUT'];
-    if (!commonWords.includes(usMatch[1])) {
-      ticker = usMatch[1];
+    function switchTab(btn) {
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.tab-pane').forEach(x => x.classList.remove('active'));
+      document.getElementById(`tab-${tab}`).classList.add('active');
     }
-  }
 
-  const loadingEl = appendMsg('ai', '<span class="msg-loading">🤖 思考中...</span>', true);
-
-  try {
-    // 热点扫描 - 明确的命令
-    if (/^(热点|扫描热点|hot|trending)$/i.test(text.trim())) {
-      loadingEl.innerHTML = '正在扫描热点资产...';
-      const r = await fetch('/api/hot');
-      const data = await r.json();
-      const items = data.trending || [];
-      loadingEl.innerHTML = items.length
-        ? `🔥 <b>今日热点</b><br><br>${items.slice(0,6).map(i => `• ${i.symbol || i.name}: ${i.reason || ''}`).join('<br>')}`
-        : '暂无热点数据，请稍后重试。';
-    } 
-    // 明确的股票分析命令 (必须同时有股票代码和分析关键词)
-    else if (ticker && /^(分析|查|看看|研究)\s*.{0,10}$/i.test(text.replace(ticker, '').replace(/港股|美股|加密/g, ''))) {
-      loadingEl.innerHTML = `🤖 正在分析 <b>${ticker}</b>，请稍候...`;
-      const [priceR, analyzeR] = await Promise.all([
-        fetch(`/api/price/${ticker}`),
-        fetch(`/api/analyze/${ticker}`),
-      ]);
-      const priceData = await priceR.json();
-      const analyzeData = await analyzeR.json();
-      
-      if (priceData.error) {
-        // 如果查不到价格，让 AI 回答
-        const r = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text })
-        });
-        const data = await r.json();
-        loadingEl.innerHTML = data.reply ? data.reply.replace(/\n/g, '<br>') : '暂无回复';
-      } else {
-        const result = analyzeData[0] || analyzeData;
-        const score = result.total_score || result.score;
-        const rec = result.recommendation || result.signal || 'HOLD';
-        const recColor = rec === 'BUY' ? '#3fb950' : rec === 'SELL' ? '#f85149' : '#e3b341';
-        const chg = priceData.change_pct;
-        const sign = chg >= 0 ? '+' : '';
-
-        loadingEl.innerHTML = `
-          <b>${ticker}</b> — ${priceData.name || ''}<br>
-          价格: <b>${priceData.price?.toFixed(2) || '--'}</b> &nbsp;
-          涨跌: <span style="color:${chg>=0?'#3fb950':'#f85149'}">${sign}${chg?.toFixed(2)}%</span><br><br>
-          AI评分: <b style="color:${recColor}">${score !== undefined ? (score*100).toFixed(0) : '--'} / 100</b><br>
-          建议: <b style="color:${recColor}">${rec}</b><br>
-          ${result.ai_summary ? `<br>${result.ai_summary}` : ''}
-        `;
-        // 同时更新图表
-        selectSymbol(ticker);
-      }
-    } 
-    // 其他所有消息 - 交给 AI 处理
-    else {
-      loadingEl.innerHTML = '🤖 龙虾交易助手思考中... <span id="chat-timer">(0s)</span>';
-      
-      // 添加超时计时器
-      let seconds = 0;
-      const timerEl = loadingEl.querySelector('#chat-timer');
-      const timerInterval = setInterval(() => {
-        seconds++;
-        if (timerEl) timerEl.textContent = `(${seconds}s)`;
-        // 8秒后显示提示
-        if (seconds === 8) {
-          loadingEl.innerHTML += '<br><span style="color:var(--muted);font-size:11px;">💡 系统繁忙，建议用快捷命令：分析 AAPL / 查询 BTC</span>';
-        }
-      }, 1000);
-      
+    async function loadHealth() {
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000); // 20秒前端超时
-        
-        const r = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text, context: { activeSymbol, ticker } }),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        clearInterval(timerInterval);
-        
-        if (!r.ok) throw new Error('Network error');
-        const data = await r.json();
-        loadingEl.innerHTML = data.reply ? data.reply.replace(/\n/g, '<br>') : '暂无回复';
-      } catch (err) {
-        clearInterval(timerInterval);
-        if (err.name === 'AbortError') {
-          loadingEl.innerHTML = '⏳ 请求超时<br><br>💡 试试快捷命令：<br>• 分析 AAPL<br>• 查询 BTC价格<br>• 扫描热点';
-        } else {
-          loadingEl.innerHTML = '⚠️ 连接不稳定<br><br>💡 请刷新页面重试，或使用左侧快捷操作';
-        }
+        const h = await api('/api/health');
+        document.getElementById('health-text').textContent = `Health: ${h.ok ? 'ok' : 'down'}`;
+      } catch {
+        document.getElementById('health-text').textContent = 'Health: down';
       }
     }
-  } catch(e) {
-    loadingEl.innerHTML = '⚠️ 请求失败<br><br>💡 请检查网络连接，或刷新页面重试';
-  }
 
-  scrollChat();
-}
-
-function appendMsg(role, html, returnEl = false) {
-  const container = document.getElementById('chat-messages');
-  const div = document.createElement('div');
-  div.className = `msg ${role}`;
-  div.innerHTML = html;
-  container.appendChild(div);
-  scrollChat();
-  return returnEl ? div : null;
-}
-
-function scrollChat() {
-  const c = document.getElementById('chat-messages');
-  c.scrollTop = c.scrollHeight;
-}
-
-// ── Agent 动态 ────────────────────────────────────────────────────
-function addFeedItem(type, text) {
-  const container = document.getElementById('feed-content');
-  const now = new Date().toLocaleTimeString('zh', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  const div = document.createElement('div');
-  div.className = `feed-item ${type}`;
-  div.innerHTML = `<div class="feed-time">${now}</div>${text}`;
-  container.insertBefore(div, container.firstChild);
-  // 最多保留 50 条
-  while (container.children.length > 50) container.removeChild(container.lastChild);
-}
-
-// ── Tab 切换 ─────────────────────────────────────────────────────
-function switchTab(name, btn) {
-  ['chat','analysis','feed'].forEach(t => {
-    document.getElementById(`tab-${t}`).style.display = t === name ? 'flex' : 'none';
-  });
-  document.querySelectorAll('.panel-tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  if (name === 'chat') scrollChat();
-}
-
-// ── WebSocket 实时价格 ────────────────────────────────────────────
-function connectWS() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}/ws`);
-
-  ws.onmessage = (e) => {
-    const data = JSON.parse(e.data);
-    if (data.type === 'price_tick' && data.symbol) {
-      prices[data.symbol] = data;
-      if (data.symbol === activeSymbol) updateHeader(data);
-      // 更新自选股行
-      updateWatchlistRow(data);
+    async function loadExecutionConfig() {
+      try {
+        const cfg = await api('/api/execution/config');
+        document.getElementById('mode-pill').textContent = `Mode: ${cfg.mode}`;
+        document.getElementById('kill-pill').textContent = `Kill: ${cfg.kill_switch ? 'ON' : 'OFF'}`;
+        document.getElementById('exec-mode').value = cfg.mode;
+        document.getElementById('exec-kill').value = cfg.kill_switch ? 'on' : 'off';
+      } catch (e) {
+        logFeed(`加载执行配置失败: ${e.message}`, 'err');
+      }
     }
-  };
 
-  ws.onclose = () => setTimeout(connectWS, 5000);
-  ws.onerror = () => ws.close();
+    async function saveExecConfig() {
+      const mode = document.getElementById('exec-mode').value;
+      const kill = document.getElementById('exec-kill').value === 'on';
+      try {
+        const res = await api('/api/execution/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode, kill_switch: kill }),
+        });
+        logFeed(`执行配置已更新: ${res.mode} / kill=${res.kill_switch}`, 'ok');
+        await loadExecutionConfig();
+      } catch (e) {
+        logFeed(`保存执行配置失败: ${e.message}`, 'err');
+      }
+    }
 
-  // 心跳
-  setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send('ping'); }, 30000);
-}
+    async function loadWatchlist() {
+      const box = document.getElementById('watchlist');
+      box.innerHTML = '';
+      try {
+        const items = await api('/api/watchlist');
+        if (!items.length) {
+          box.innerHTML = '<div class="tiny muted">Watchlist empty. Use Add or Load Demo.</div>';
+          return;
+        }
+        items.forEach(item => {
+          state.prices[item.symbol] = item;
+          const d = document.createElement('div');
+          const c = Number(item.change_pct || 0);
+          d.className = `item ${item.symbol === state.activeSymbol ? 'active' : ''}`;
+          d.innerHTML = `
+            <div>
+              <div class="mono">${item.symbol}</div>
+              <small>${item.name || ''}</small>
+            </div>
+            <div class="mono">${item.price ? item.price.toFixed(item.price > 100 ? 2 : 4) : '--'}</div>
+            <div class="${c >= 0 ? 'price-up' : 'price-down'} mono">${c >= 0 ? '+' : ''}${c.toFixed(2)}%</div>
+          `;
+          d.onclick = () => selectSymbol(item.symbol);
+          box.appendChild(d);
+        });
+      } catch (e) {
+        box.innerHTML = `<div class="tiny muted">加载失败: ${e.message}</div>`;
+      }
+    }
 
-function updateWatchlistRow(data) {
-  const el = document.getElementById(`wl-${data.symbol}`);
-  if (!el) return;
-  const priceEl = el.querySelector('.wl-price');
-  const chgEl = el.querySelector('.wl-chg');
-  if (priceEl && data.price) {
-    priceEl.textContent = data.price.toFixed(data.price > 100 ? 2 : 4);
-  }
-  if (chgEl && data.change_pct !== undefined) {
-    const sign = data.change_pct >= 0 ? '+' : '';
-    chgEl.textContent = `${sign}${data.change_pct.toFixed(2)}%`;
-    chgEl.style.color = data.change_pct >= 0 ? 'var(--green)' : 'var(--red)';
-  }
-}
+    async function addDemo() {
+      for (const sym of ['AAPL', 'NVDA', 'BTC-USD']) {
+        await fetch(`/api/watchlist/${sym}`, { method: 'POST' });
+      }
+      await loadWatchlist();
+      logFeed('示例标的已加载', 'ok');
+    }
 
-// ── 键盘快捷键 ────────────────────────────────────────────────────
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && document.activeElement === document.getElementById('search-input')) {
-    addSymbol();
-  }
-});
+    async function addSymbol() {
+      const input = document.getElementById('search-input');
+      const sym = input.value.trim().toUpperCase();
+      if (!sym) return;
+      const r = await api(`/api/watchlist/${sym}`, { method: 'POST' });
+      logFeed(r.success ? `${sym} added` : `${sym} add failed: ${r.message}`, r.success ? 'ok' : 'warn');
+      input.value = '';
+      document.getElementById('search-dropdown').classList.remove('show');
+      await loadWatchlist();
+      if (r.success) selectSymbol(sym);
+    }
 
-// ── 初始化 ───────────────────────────────────────────────────────
-initChart();
-connectWS();
-loadWatchlist().then(() => {
-  if (!activeSymbol) selectSymbol('AAPL');
-});
-addFeedItem('success', '✅ OpenClaw Trading OS 已启动');
-</script>
+    async function selectSymbol(sym) {
+      state.activeSymbol = sym;
+      document.getElementById('order-symbol').value = sym;
+      await Promise.all([loadPrice(sym), loadChart(sym, state.period), loadWatchlist()]);
+    }
+
+    async function loadPrice(sym) {
+      const data = await api(`/api/price/${sym}`);
+      if (data.error) return;
+      state.prices[sym] = data;
+      const p = Number(data.price || 0);
+      const c = Number(data.change_pct || 0);
+      document.getElementById('symbol-name').textContent = data.symbol || sym;
+      document.getElementById('symbol-desc').textContent = data.name || '';
+      document.getElementById('symbol-price').textContent = `${data.currency || ''} ${p ? p.toFixed(p > 100 ? 2 : 4) : '--'}`;
+      const changeEl = document.getElementById('symbol-change');
+      changeEl.textContent = `${c >= 0 ? '+' : ''}${c.toFixed(2)}%`;
+      changeEl.className = `tiny ${c >= 0 ? 'price-up' : 'price-down'}`;
+    }
+
+    async function loadChart(sym, period) {
+      const data = await api(`/api/chart/${sym}?period=${period}`);
+      if (!data || !data.data || !data.data.length) return;
+      const candles = data.data
+        .map(d => ({
+          time: Math.floor(new Date(d.date).getTime() / 1000),
+          open: d.open, high: d.high, low: d.low, close: d.close,
+        }))
+        .filter(d => d.open && d.high && d.low && d.close)
+        .sort((a, b) => a.time - b.time);
+
+      state.candle.setData(candles);
+      state.chart.timeScale().fitContent();
+    }
+
+    function changePeriod(period, btn) {
+      state.period = period;
+      document.querySelectorAll('.periods .btn').forEach(x => x.classList.remove('primary'));
+      btn.classList.add('primary');
+      loadChart(state.activeSymbol, period);
+    }
+
+    async function placeOrder() {
+      const payload = {
+        symbol: document.getElementById('order-symbol').value.trim().toUpperCase(),
+        side: document.getElementById('order-side').value,
+        order_type: document.getElementById('order-type').value,
+        quantity: Number(document.getElementById('order-qty').value),
+        limit_price: document.getElementById('order-limit').value ? Number(document.getElementById('order-limit').value) : null,
+      };
+
+      if (!payload.symbol || !payload.quantity) {
+        document.getElementById('order-result').textContent = 'symbol 和 quantity 必填';
+        return;
+      }
+
+      try {
+        const res = await api('/api/orders/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        document.getElementById('order-result').textContent = JSON.stringify(res);
+        logFeed(`order ${res.status || 'unknown'}: ${res.order_id || '-'} ${res.error || ''}`, res.success ? 'ok' : 'warn');
+        await loadOrdersPositionsRuns();
+      } catch (e) {
+        document.getElementById('order-result').textContent = e.message;
+        logFeed(`下单失败: ${e.message}`, 'err');
+      }
+    }
+
+    async function createStrategy() {
+      const payload = {
+        name: document.getElementById('st-name').value.trim(),
+        market: document.getElementById('st-market').value,
+        symbol: document.getElementById('st-symbol').value.trim().toUpperCase(),
+        timeframe: document.getElementById('st-timeframe').value.trim() || '1d',
+        config: {},
+      };
+      if (!payload.name || !payload.symbol) return;
+      const r = await api('/api/strategies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      logFeed(`strategy created #${r.strategy_id}`, 'ok');
+      await loadStrategies();
+    }
+
+    async function loadStrategies() {
+      const rows = await api('/api/strategies');
+      const box = document.getElementById('strategies-list');
+      if (!rows.length) {
+        box.innerHTML = '<div class="tiny muted">No strategies yet.</div>';
+        return;
+      }
+      box.innerHTML = `<table><thead><tr><th>Name</th><th>Symbol</th><th>Status</th></tr></thead><tbody>${rows.map(r =>
+        `<tr><td>${r.name}</td><td class="mono">${r.symbol}</td><td>${r.status}</td></tr>`).join('')}</tbody></table>`;
+    }
+
+    async function createRule() {
+      const type = document.getElementById('rule-type').value;
+      const name = document.getElementById('rule-name').value.trim() || type;
+      let value = {};
+      try { value = JSON.parse(document.getElementById('rule-json').value || '{}'); } catch {
+        logFeed('risk rule JSON 格式错误', 'err');
+        return;
+      }
+
+      await api('/api/risk-rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rule_type: type, name, value, enabled: true }),
+      });
+      logFeed(`risk rule created: ${type}`, 'ok');
+      await loadRiskRules();
+    }
+
+    async function loadRiskRules() {
+      const rows = await api('/api/risk-rules');
+      const box = document.getElementById('risk-list');
+      if (!rows.length) {
+        box.innerHTML = '<div class="tiny muted">No risk rules.</div>';
+        return;
+      }
+      box.innerHTML = `<table><thead><tr><th>Name</th><th>Type</th><th>Enabled</th></tr></thead><tbody>${rows.map(r =>
+        `<tr><td>${r.name}</td><td class="mono">${r.rule_type}</td><td>${r.enabled ? 'yes' : 'no'}</td></tr>`).join('')}</tbody></table>`;
+    }
+
+    async function loadOrdersPositionsRuns() {
+      const [orders, positions, runs] = await Promise.all([
+        api('/api/orders?limit=20'),
+        api('/api/positions'),
+        api('/api/agent-runs?limit=20'),
+      ]);
+
+      document.getElementById('orders-table').innerHTML = renderTable(
+        ['id', 'symbol', 'side', 'order_type', 'quantity', 'status'],
+        orders
+      );
+      document.getElementById('positions-table').innerHTML = renderTable(
+        ['symbol', 'quantity', 'avg_cost', 'last_price', 'unrealized_pnl'],
+        positions
+      );
+      document.getElementById('runs-table').innerHTML = renderTable(
+        ['id', 'run_type', 'status', 'started_at', 'error'],
+        runs
+      );
+    }
+
+    function renderTable(cols, rows) {
+      if (!rows.length) return '<div class="tiny muted">No data.</div>';
+      return `<table><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.map(r =>
+        `<tr>${cols.map(c => `<td class="${c.includes('id') || c.includes('symbol') ? 'mono' : ''}">${r[c] ?? ''}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    }
+
+    async function loadAgentConfig() {
+      const cfg = await api('/api/agent/config');
+      document.getElementById('agent-name').value = cfg.agent_name || '';
+      document.getElementById('agent-mode').value = cfg.mode || 'advisor';
+      document.getElementById('agent-style').value = cfg.response_style || 'standard';
+      document.getElementById('agent-risk').value = cfg.risk_level || 'balanced';
+      document.getElementById('cap-market').checked = !!cfg.capabilities?.market_brief;
+      document.getElementById('cap-tech').checked = !!cfg.capabilities?.technical_analysis;
+      document.getElementById('cap-news').checked = !!cfg.capabilities?.news_reasoning;
+      document.getElementById('cap-portfolio').checked = !!cfg.capabilities?.portfolio_review;
+      document.getElementById('cap-risk').checked = !!cfg.capabilities?.risk_guard;
+      document.getElementById('cap-exec').checked = !!cfg.capabilities?.execution_plan;
+    }
+
+    async function saveAgentConfig() {
+      const payload = {
+        agent_name: document.getElementById('agent-name').value.trim() || 'OpenClaw Trading Strategist',
+        mode: document.getElementById('agent-mode').value,
+        response_style: document.getElementById('agent-style').value,
+        risk_level: document.getElementById('agent-risk').value,
+        capabilities: {
+          market_brief: document.getElementById('cap-market').checked,
+          technical_analysis: document.getElementById('cap-tech').checked,
+          news_reasoning: document.getElementById('cap-news').checked,
+          portfolio_review: document.getElementById('cap-portfolio').checked,
+          risk_guard: document.getElementById('cap-risk').checked,
+          execution_plan: document.getElementById('cap-exec').checked,
+        }
+      };
+      const res = await api('/api/agent/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      logFeed(`agent profile saved: ${res.profile.agent_name}`, 'ok');
+    }
+
+    function appendChat(role, text) {
+      const box = document.getElementById('chat-box');
+      const d = document.createElement('div');
+      d.className = `msg ${role}`;
+      d.innerHTML = text.replace(/\n/g, '<br>');
+      box.appendChild(d);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    async function quickAsk(msg) {
+      document.getElementById('chat-input').value = msg;
+      await sendChat();
+    }
+
+    async function sendChat() {
+      const input = document.getElementById('chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      appendChat('user', text);
+      appendChat('ai', '思考中...');
+      const loading = document.querySelector('#chat-box .msg.ai:last-child');
+      try {
+        const res = await api('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, context: { activeSymbol: state.activeSymbol } }),
+        });
+        loading.innerHTML = (res.reply || 'no reply').replace(/\n/g, '<br>');
+      } catch (e) {
+        loading.innerHTML = `请求失败: ${e.message}`;
+      }
+    }
+
+    function connectWS() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      state.ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+      state.ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.type === 'price_tick' && data.symbol) {
+          state.prices[data.symbol] = data;
+          if (data.symbol === state.activeSymbol) {
+            loadPrice(data.symbol);
+          }
+        }
+      };
+
+      state.ws.onclose = () => setTimeout(connectWS, 4000);
+
+      setInterval(() => {
+        if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.send('ping');
+      }, 30000);
+    }
+
+    const searchInput = document.getElementById('search-input');
+    const searchDropdown = document.getElementById('search-dropdown');
+    let searchTimer = null;
+
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      const q = searchInput.value.trim();
+      if (!q) {
+        searchDropdown.classList.remove('show');
+        return;
+      }
+      searchTimer = setTimeout(() => doSearch(q), 150);
+    });
+
+    async function doSearch(q) {
+      const rows = await api(`/api/search?q=${encodeURIComponent(q)}`);
+      if (!rows.length) {
+        searchDropdown.classList.remove('show');
+        return;
+      }
+      searchDropdown.innerHTML = rows.map(r =>
+        `<div class="drop-item" onclick="pickSearch('${r.symbol}')"><span class="mono">${r.symbol}</span><span class="muted">${r.market}</span></div>`
+      ).join('');
+      searchDropdown.classList.add('show');
+    }
+
+    function pickSearch(sym) {
+      searchInput.value = sym;
+      searchDropdown.classList.remove('show');
+      addSymbol();
+    }
+
+    async function loadAllData() {
+      document.getElementById('left-ts').textContent = new Date().toLocaleTimeString();
+      await loadHealth();
+      await loadExecutionConfig();
+      await loadWatchlist();
+      await loadPrice(state.activeSymbol);
+      await loadChart(state.activeSymbol, state.period);
+      await loadAgentConfig();
+      await loadStrategies();
+      await loadRiskRules();
+      await loadOrdersPositionsRuns();
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && document.activeElement === searchInput) addSymbol();
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && document.activeElement === document.getElementById('chat-input')) sendChat();
+    });
+
+    initChart();
+    connectWS();
+    loadAllData();
+    changePeriod('1d', document.querySelector('.periods .btn'));
+    appendChat('ai', 'Agent Studio 就绪。请先在上方配置 Agent 模式，然后输入你的交易问题。');
+  </script>
 </body>
 </html>

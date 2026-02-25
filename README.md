@@ -38,6 +38,34 @@ uvicorn dashboard.backend.main:app --host 127.0.0.1 --port 8080 --reload
 
 打开：`http://127.0.0.1:8080`
 
+## Run Tests
+
+```bash
+cd /Users/vv/.openclaw/workspace/skills/trading-os
+python3 -m pytest
+```
+
+## Trading APIs (Phase 3)
+
+- `GET /api/execution/config`
+- `POST /api/execution/config` (`mode`: `PAPER|LIVE`, `kill_switch`: `true|false`)
+- `POST /api/orders/execute` (统一执行入口，先走风控与 kill switch)
+- `POST /api/orders/paper` (兼容入口)
+- `GET /api/orders`
+- `GET /api/positions`
+- `GET /api/risk-rules`
+- `POST /api/risk-rules`
+- `GET /api/agent-runs`
+
+## Agent Profile APIs
+
+- `GET /api/agent/config`
+- `POST /api/agent/config`
+
+说明：
+- 页面右侧 AI 面板已支持可视化配置 Agent（模式、响应风格、语言、风险偏好、能力开关）。
+- `/api/chat` 会按当前 Agent 配置生成响应契约并驱动 OpenClaw 回复结构。
+
 ## Runtime Dependencies
 
 仓库会复用你本地 OpenClaw 工作区中的其他技能：

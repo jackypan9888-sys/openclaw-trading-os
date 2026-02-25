@@ -19,3 +19,6 @@ python-dateutil>=2.9.0
 # 市场数据（现有环境通常已有）
 yfinance>=0.2.40
 pandas>=2.0.0
+
+# 测试
+pytest>=8.0.0

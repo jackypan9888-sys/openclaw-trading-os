@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
+
 @dataclass
 class User:
     id: int
@@ -37,6 +38,85 @@ class AlertLog:
     ai_summary: Optional[str]
     delivered: bool
     message_id: Optional[int]
+
+
+@dataclass
+class Strategy:
+    id: int
+    user_id: int
+    name: str
+    market: str
+    symbol: str
+    timeframe: str
+    config_json: str
+    status: str
+    created_at: str
+    updated_at: str
+
+
+@dataclass
+class Order:
+    id: int
+    user_id: int
+    strategy_id: Optional[int]
+    symbol: str
+    side: str
+    order_type: str
+    quantity: float
+    limit_price: Optional[float]
+    stop_price: Optional[float]
+    tif: str
+    status: str
+    broker_order_id: Optional[str]
+    reject_reason: Optional[str]
+    created_at: str
+    updated_at: str
+
+
+@dataclass
+class Position:
+    id: int
+    user_id: int
+    symbol: str
+    quantity: float
+    avg_cost: float
+    last_price: Optional[float]
+    market_value: Optional[float]
+    unrealized_pnl: Optional[float]
+    updated_at: str
+
+
+@dataclass
+class RiskRule:
+    id: int
+    user_id: int
+    name: str
+    rule_type: str
+    value_json: str
+    enabled: bool
+    created_at: str
+    updated_at: str
+
+
+@dataclass
+class AgentRun:
+    id: int
+    user_id: int
+    strategy_id: Optional[int]
+    run_type: str
+    input_json: str
+    output_json: Optional[str]
+    status: str
+    error: Optional[str]
+    started_at: str
+    finished_at: Optional[str]
+
+
+@dataclass
+class AppSetting:
+    key: str
+    value: str
+    updated_at: str
 
 # 预警冷却时间（小时）
 ALERT_COOLDOWN = {
