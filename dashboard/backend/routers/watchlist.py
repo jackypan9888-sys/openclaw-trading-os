@@ -1,5 +1,4 @@
 """Watchlist routes."""
-import asyncio
 from typing import Optional
 
 from fastapi import APIRouter
@@ -15,16 +14,32 @@ async def get_watchlist():
     if not items:
         return []
 
-    loop = asyncio.get_event_loop()
     result = []
     for item in items:
-        price_data = await loop.run_in_executor(None, provider.get_price, item.symbol)
+        try:
+            price_data = provider.get_price(item.symbol)
+        except Exception:
+            price_data = None
         if price_data:
-            result.append({
-                **price_data,
-                "target_price": item.target_price,
-                "stop_price": item.stop_price,
-            })
+            row = {**price_data}
+        else:
+            # Keep watchlist entries visible even when live quote fetch fails.
+            row = {
+                "symbol": item.symbol,
+                "name": item.symbol,
+                "price": None,
+                "currency": "",
+                "change": 0,
+                "change_pct": 0,
+                "market_state": "UNAVAILABLE",
+                "timestamp": None,
+            }
+
+        result.append({
+            **row,
+            "target_price": item.target_price,
+            "stop_price": item.stop_price,
+        })
     return result
 
 
@@ -32,8 +47,10 @@ async def get_watchlist():
 async def add_watchlist(symbol: str, target_price: Optional[float] = None, stop_price: Optional[float] = None):
     ok, msg = store.add_watchlist(demo_user.id, symbol.upper(), target_price, stop_price)
     if ok:
-        loop = asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, provider.get_price, symbol.upper())
+        try:
+            data = provider.get_price(symbol.upper())
+        except Exception:
+            data = None
         if data:
             await feed.broadcast({"type": "price_tick", **data})
     return {"success": ok, "message": msg or "Added"}

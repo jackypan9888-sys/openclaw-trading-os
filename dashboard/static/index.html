@@ -80,6 +80,27 @@
       flex-wrap: wrap;
       justify-content: flex-end;
     }
+    .top-links {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .link-chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: #b9d0de;
+      text-decoration: none;
+      background: rgba(16, 27, 34, 0.78);
+      transition: .16s ease;
+    }
+    .link-chip:hover {
+      color: var(--brand);
+      border-color: #2d5c6f;
+      transform: translateY(-1px);
+    }
 
     .pill {
       border: 1px solid var(--line);
@@ -99,6 +120,7 @@
       border-radius: 50%;
       background: var(--up);
     }
+    .live-dot.down { background: var(--down); }
 
     .btn {
       border: 1px solid var(--line);
@@ -217,18 +239,51 @@
       border-radius: 10px;
       padding: 9px;
       display: grid;
-      grid-template-columns: 1fr auto auto;
+      grid-template-columns: 1fr auto auto auto;
       align-items: center;
       gap: 8px;
       cursor: pointer;
-      background: rgba(12, 21, 27, 0.75);
+      background: linear-gradient(180deg, rgba(14, 24, 31, 0.92), rgba(10, 19, 25, 0.9));
     }
 
-    .item.active { border-color: #2b6d64; background: rgba(24,194,156,.09); }
+    .item.active {
+      border-color: #2d8b7f;
+      background: rgba(24,194,156,.16);
+      box-shadow: inset 0 0 0 1px rgba(24,194,156,.35);
+    }
     .item small { color: var(--muted); }
+    .watchlist-highlight {
+      border: 1px solid #2f5f73;
+      border-radius: 12px;
+      padding: 10px;
+      background: linear-gradient(180deg, rgba(18, 41, 52, 0.5), rgba(10, 23, 30, 0.5));
+    }
+    .watchlist-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 13px;
+    }
+    .watchlist-tag {
+      font-size: 11px;
+      color: #8ee9d2;
+      border: 1px solid #2d7363;
+      border-radius: 999px;
+      padding: 2px 8px;
+      background: rgba(24,194,156,.14);
+    }
 
     .price-up { color: var(--up); font-weight: 600; }
     .price-down { color: var(--down); font-weight: 600; }
+    .btn.danger {
+      border-color: #6a2e33;
+      background: linear-gradient(180deg, #3a1f24, #2e171c);
+      color: #ffb8bf;
+      padding: 5px 8px;
+      font-size: 11px;
+    }
 
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
@@ -340,6 +395,22 @@
     .feed-item.ok { border-color: var(--up); }
     .feed-item.warn { border-color: var(--warn); }
     .feed-item.err { border-color: var(--down); }
+    .banner {
+      margin: 8px 14px 0;
+      border: 1px solid #6b4d21;
+      color: #ffd9a8;
+      background: rgba(255, 159, 69, 0.12);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+      display: none;
+    }
+    .banner.show { display: block; }
+    .banner.err {
+      border-color: #7f2730;
+      color: #ffd0d6;
+      background: rgba(255, 95, 103, 0.15);
+    }
 
     @media (max-width: 1180px) {
       body { overflow: auto; }
@@ -357,67 +428,53 @@
     <div class="topbar">
       <div class="brand">
         <span class="dot"></span>
-        <span>OPENCLAW TRADING OS</span>
+        <span>OpenClaw 交易作战台</span>
       </div>
       <div class="status-cluster" id="status-cluster">
-        <span class="pill"><span class="live-dot"></span><span id="health-text">Health: checking</span></span>
-        <span class="pill" id="mode-pill">Mode: --</span>
-        <span class="pill" id="kill-pill">Kill: --</span>
+        <span class="pill"><span class="live-dot"></span><span id="health-text">服务健康: 检查中</span></span>
+        <span class="pill" id="mode-pill">执行模式: --</span>
+        <span class="pill" id="kill-pill">熔断开关: --</span>
+        <span class="pill" id="api-pill">连接状态: 初始化</span>
       </div>
-      <button class="btn" onclick="loadAllData()">Refresh</button>
+      <div class="top-links">
+        <a class="link-chip" href="http://127.0.0.1:8765/#agent=trading-os&floor=operations-floor" target="_blank">进入 OpenClaw 交易Agent</a>
+        <a class="link-chip" href="http://127.0.0.1:8765/" target="_blank">打开 OpenClaw HQ</a>
+        <a class="link-chip" href="/api/agent/config" target="_blank">Agent 配置API</a>
+        <a class="link-chip" href="/api/ai/config" target="_blank">AI 配置API</a>
+        <a class="link-chip" href="/api/execution/config" target="_blank">执行配置API</a>
+        <button class="btn" onclick="loadAllData()">刷新全局</button>
+      </div>
     </div>
+    <div id="access-banner" class="banner"></div>
+    <div id="api-banner" class="banner err"></div>
 
     <div class="main">
       <section class="panel">
         <div class="panel-header">
-          <span>Market & Execution</span>
+          <span>自选列表</span>
           <span class="tiny muted mono" id="left-ts">--</span>
         </div>
         <div class="panel-body">
           <div class="search">
             <input id="search-input" placeholder="搜索标的: AAPL / 0700.HK / BTC-USD" autocomplete="off" />
-            <button class="btn primary" onclick="addSymbol()">Add</button>
+            <button class="btn primary" onclick="addSymbol()">加入自选</button>
             <div class="dropdown" id="search-dropdown"></div>
           </div>
 
           <div class="meta-box">
             <div class="row" style="margin-bottom:8px">
-              <button class="btn" onclick="loadWatchlist()">Reload Watchlist</button>
-              <button class="btn" onclick="addDemo()">Load Demo</button>
+              <button class="btn" onclick="loadWatchlist()">刷新自选</button>
+              <button class="btn" onclick="addDemo()">加载示例</button>
             </div>
-            <div class="list" id="watchlist"></div>
+            <div class="watchlist-highlight">
+              <div class="watchlist-header">
+                <span>自选列表（核心）</span>
+                <span class="watchlist-tag">优先监控</span>
+              </div>
+              <div class="list" id="watchlist"></div>
+            </div>
           </div>
 
-          <div class="meta-box">
-            <div class="row" style="margin-bottom:8px">
-              <select id="exec-mode">
-                <option value="PAPER">PAPER</option>
-                <option value="LIVE">LIVE</option>
-              </select>
-              <select id="exec-kill">
-                <option value="off">Kill Switch Off</option>
-                <option value="on">Kill Switch On</option>
-              </select>
-              <button class="btn" onclick="saveExecConfig()">Apply</button>
-            </div>
-            <div class="tiny muted">执行入口统一走 <span class="mono">/api/orders/execute</span>，会先经过风控和熔断。</div>
-          </div>
-
-          <div class="meta-box">
-            <div class="grid-3" style="margin-bottom:8px">
-              <input id="order-symbol" placeholder="Symbol" />
-              <select id="order-side"><option>BUY</option><option>SELL</option></select>
-              <select id="order-type"><option>MARKET</option><option>LIMIT</option></select>
-            </div>
-            <div class="grid-3" style="margin-bottom:8px">
-              <input id="order-qty" type="number" step="0.0001" placeholder="Qty" />
-              <input id="order-limit" type="number" step="0.0001" placeholder="Limit Price" />
-              <button class="btn primary" onclick="placeOrder()">Execute</button>
-            </div>
-            <div class="tiny muted" id="order-result">等待下单</div>
-          </div>
-
-          <div class="feed" id="feed"></div>
         </div>
       </section>
 
@@ -444,16 +501,16 @@
 
       <section class="panel">
         <div class="tabs">
-          <div class="tab active" data-tab="chat" onclick="switchTab(this)">Agent</div>
-          <div class="tab" data-tab="strategies" onclick="switchTab(this)">Strategies</div>
-          <div class="tab" data-tab="risk" onclick="switchTab(this)">Risk</div>
-          <div class="tab" data-tab="activity" onclick="switchTab(this)">Activity</div>
+          <div class="tab active" data-tab="chat" onclick="switchTab(this)">交易Agent</div>
+          <div class="tab" data-tab="strategies" onclick="switchTab(this)">策略</div>
+          <div class="tab" data-tab="risk" onclick="switchTab(this)">风控</div>
+          <div class="tab" data-tab="activity" onclick="switchTab(this)">活动</div>
         </div>
 
         <div class="tab-pane active" id="tab-chat">
           <div class="meta-box" style="margin-bottom:10px">
             <div class="grid-2" style="margin-bottom:8px">
-              <input id="agent-name" placeholder="Agent Name" />
+              <input id="agent-name" placeholder="Agent 名称" />
               <select id="agent-mode">
                 <option value="advisor">advisor</option>
                 <option value="semi_auto">semi_auto</option>
@@ -479,8 +536,8 @@
               <label class="tiny muted"><input type="checkbox" id="cap-exec" /> execution_plan</label>
             </div>
             <div class="row">
-              <button class="btn" onclick="loadAgentConfig()">Load</button>
-              <button class="btn primary" onclick="saveAgentConfig()">Save Agent Config</button>
+              <button class="btn" onclick="loadAgentConfig()">加载配置</button>
+              <button class="btn primary" onclick="saveAgentConfig()">保存 Agent 配置</button>
             </div>
           </div>
 
@@ -489,21 +546,21 @@
             <textarea id="chat-input" rows="2" placeholder="输入你的交易问题，例如：分析 AAPL 并给出今天可执行计划"></textarea>
           </div>
           <div class="row" style="margin-top:8px">
-            <button class="btn primary" onclick="sendChat()">Send</button>
-            <button class="btn" onclick="quickAsk('给我当前持仓风险复盘')">Risk Review</button>
-            <button class="btn" onclick="quickAsk('给我今天3条可执行交易计划')">Action Plan</button>
+            <button class="btn primary" onclick="sendChat()">发送</button>
+            <button class="btn" onclick="quickAsk('给我当前持仓风险复盘')">风险复盘</button>
+            <button class="btn" onclick="quickAsk('给我今天3条可执行交易计划')">行动计划</button>
           </div>
         </div>
 
         <div class="tab-pane" id="tab-strategies">
           <div class="meta-box" style="margin-bottom:10px">
             <div class="grid-2" style="margin-bottom:8px">
-              <input id="st-name" placeholder="Strategy name" />
-              <input id="st-symbol" placeholder="Symbol" />
+              <input id="st-name" placeholder="策略名称" />
+              <input id="st-symbol" placeholder="代码" />
               <select id="st-market"><option>US</option><option>HK</option><option>Crypto</option></select>
-              <input id="st-timeframe" placeholder="Timeframe (1d/4h)" value="1d" />
+              <input id="st-timeframe" placeholder="周期 (1d/4h)" value="1d" />
             </div>
-            <button class="btn primary" onclick="createStrategy()">Create Strategy</button>
+            <button class="btn primary" onclick="createStrategy()">创建策略</button>
           </div>
           <div id="strategies-list"></div>
         </div>
@@ -517,28 +574,28 @@
                 <option value="max_position_value_usd">max_position_value_usd</option>
                 <option value="allowed_symbols">allowed_symbols</option>
               </select>
-              <input id="rule-name" placeholder="Rule name" />
+              <input id="rule-name" placeholder="规则名称" />
             </div>
             <textarea id="rule-json" rows="3" class="mono" placeholder='{"usd": 5000}'></textarea>
-            <button class="btn primary" style="margin-top:8px" onclick="createRule()">Create Rule</button>
+            <button class="btn primary" style="margin-top:8px" onclick="createRule()">创建规则</button>
           </div>
           <div id="risk-list"></div>
         </div>
 
         <div class="tab-pane" id="tab-activity">
           <div class="meta-box" style="margin-bottom:10px">
-            <button class="btn" onclick="loadOrdersPositionsRuns()">Reload Activity</button>
+            <button class="btn" onclick="loadOrdersPositionsRuns()">刷新活动</button>
           </div>
           <div class="meta-box" style="margin-bottom:8px">
-            <div class="tiny muted" style="margin-bottom:6px">Orders</div>
+            <div class="tiny muted" style="margin-bottom:6px">订单</div>
             <div id="orders-table"></div>
           </div>
           <div class="meta-box" style="margin-bottom:8px">
-            <div class="tiny muted" style="margin-bottom:6px">Positions</div>
+            <div class="tiny muted" style="margin-bottom:6px">持仓</div>
             <div id="positions-table"></div>
           </div>
           <div class="meta-box">
-            <div class="tiny muted" style="margin-bottom:6px">Agent Runs</div>
+            <div class="tiny muted" style="margin-bottom:6px">Agent 执行记录</div>
             <div id="runs-table"></div>
           </div>
         </div>
@@ -552,12 +609,42 @@
       prices: {},
       period: '1d',
       ws: null,
+      wsHeartbeatTimer: null,
+      wsEnabled: true,
       chart: null,
       candle: null,
+      apiOk: true,
+      loadedTabs: {
+        strategy: false,
+        risk: false,
+        activity: false,
+      },
     };
+
+    function setApiStatus(ok, msg = '') {
+      state.apiOk = ok;
+      const pill = document.getElementById('api-pill');
+      const banner = document.getElementById('api-banner');
+      const dot = document.querySelector('.pill .live-dot');
+      if (!pill || !banner || !dot) return;
+      if (ok) {
+        pill.textContent = '连接状态: 在线';
+        banner.classList.remove('show');
+        dot.classList.remove('down');
+      } else {
+        pill.textContent = '连接状态: 断开';
+        banner.classList.add('show');
+        banner.innerHTML = `后端连接失败：${msg || '网络异常'}。<button class="btn" onclick="recoverConnection()">重连</button>`;
+        dot.classList.add('down');
+      }
+    }
 
     function logFeed(text, level = 'ok') {
       const el = document.getElementById('feed');
+      if (!el) {
+        console.log(`[${level}] ${text}`);
+        return;
+      }
       const d = document.createElement('div');
       d.className = `feed-item ${level}`;
       const ts = new Date().toLocaleTimeString();
@@ -566,10 +653,36 @@
       while (el.children.length > 60) el.removeChild(el.lastChild);
     }
 
-    async function api(path, options = {}) {
-      const r = await fetch(path, options);
-      if (!r.ok) throw new Error(`${path} -> ${r.status}`);
-      return await r.json();
+    async function api(path, options = {}, retry = 1) {
+      const timeoutMs = options.timeoutMs || 10000;
+      const { timeoutMs: _discard, ...fetchOptions } = options;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const r = await fetch(path, { ...fetchOptions, signal: controller.signal });
+        if (!r.ok) throw new Error(`${path} -> ${r.status}`);
+        const json = await r.json();
+        setApiStatus(true);
+        return json;
+      } catch (e) {
+        if (retry > 0) {
+          await new Promise((res) => setTimeout(res, 450));
+          return api(path, options, retry - 1);
+        }
+        setApiStatus(false, e.message || '请求失败');
+        throw e;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function recoverConnection() {
+      try {
+        await api('/api/health', {}, 0);
+        await loadAllData();
+      } catch (e) {
+        setApiStatus(false, e.message || '重连失败');
+      }
     }
 
     function initChart() {
@@ -596,50 +709,48 @@
       });
     }
 
-    function switchTab(btn) {
+    async function switchTab(btn) {
       document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
       btn.classList.add('active');
       const tab = btn.dataset.tab;
       document.querySelectorAll('.tab-pane').forEach(x => x.classList.remove('active'));
       document.getElementById(`tab-${tab}`).classList.add('active');
+
+      if (tab === 'strategy' && !state.loadedTabs.strategy) {
+        await loadStrategies();
+        state.loadedTabs.strategy = true;
+      }
+      if (tab === 'risk' && !state.loadedTabs.risk) {
+        await loadRiskRules();
+        state.loadedTabs.risk = true;
+      }
+      if (tab === 'activity' && !state.loadedTabs.activity) {
+        await loadOrdersPositionsRuns();
+        state.loadedTabs.activity = true;
+      }
     }
 
     async function loadHealth() {
       try {
         const h = await api('/api/health');
-        document.getElementById('health-text').textContent = `Health: ${h.ok ? 'ok' : 'down'}`;
+        const mode = h.fixed_mode ? '固定稳定模式' : '标准模式';
+        document.getElementById('health-text').textContent = `服务健康: ${h.ok ? '正常' : '异常'} | ${mode}`;
+        state.wsEnabled = h.ws_enabled !== false;
       } catch {
-        document.getElementById('health-text').textContent = 'Health: down';
+        document.getElementById('health-text').textContent = '服务健康: 异常';
       }
     }
 
     async function loadExecutionConfig() {
       try {
         const cfg = await api('/api/execution/config');
-        document.getElementById('mode-pill').textContent = `Mode: ${cfg.mode}`;
-        document.getElementById('kill-pill').textContent = `Kill: ${cfg.kill_switch ? 'ON' : 'OFF'}`;
-        document.getElementById('exec-mode').value = cfg.mode;
-        document.getElementById('exec-kill').value = cfg.kill_switch ? 'on' : 'off';
+        document.getElementById('mode-pill').textContent = `执行模式: ${cfg.mode}`;
+        document.getElementById('kill-pill').textContent = `熔断开关: ${cfg.kill_switch ? '开启' : '关闭'}`;
       } catch (e) {
         logFeed(`加载执行配置失败: ${e.message}`, 'err');
       }
     }
 
-    async function saveExecConfig() {
-      const mode = document.getElementById('exec-mode').value;
-      const kill = document.getElementById('exec-kill').value === 'on';
-      try {
-        const res = await api('/api/execution/config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode, kill_switch: kill }),
-        });
-        logFeed(`执行配置已更新: ${res.mode} / kill=${res.kill_switch}`, 'ok');
-        await loadExecutionConfig();
-      } catch (e) {
-        logFeed(`保存执行配置失败: ${e.message}`, 'err');
-      }
-    }
 
     async function loadWatchlist() {
       const box = document.getElementById('watchlist');
@@ -647,7 +758,7 @@
       try {
         const items = await api('/api/watchlist');
         if (!items.length) {
-          box.innerHTML = '<div class="tiny muted">Watchlist empty. Use Add or Load Demo.</div>';
+          box.innerHTML = '<div class="tiny muted">自选列表为空，请先“加入自选”或“加载示例”。</div>';
           return;
         }
         items.forEach(item => {
@@ -662,6 +773,7 @@
             </div>
             <div class="mono">${item.price ? item.price.toFixed(item.price > 100 ? 2 : 4) : '--'}</div>
             <div class="${c >= 0 ? 'price-up' : 'price-down'} mono">${c >= 0 ? '+' : ''}${c.toFixed(2)}%</div>
+            <button class="btn danger" onclick="removeSymbol(event,'${item.symbol}')">删除</button>
           `;
           d.onclick = () => selectSymbol(item.symbol);
           box.appendChild(d);
@@ -672,29 +784,50 @@
     }
 
     async function addDemo() {
-      for (const sym of ['AAPL', 'NVDA', 'BTC-USD']) {
-        await fetch(`/api/watchlist/${sym}`, { method: 'POST' });
+      try {
+        for (const sym of ['AAPL', 'NVDA', 'BTC-USD']) {
+          await api(`/api/watchlist/${sym}`, { method: 'POST' });
+        }
+        await loadWatchlist();
+        logFeed('示例标的已加载到自选列表', 'ok');
+      } catch (e) {
+        logFeed(`加载示例失败: ${e.message}`, 'err');
       }
-      await loadWatchlist();
-      logFeed('示例标的已加载', 'ok');
     }
 
     async function addSymbol() {
       const input = document.getElementById('search-input');
-      const sym = input.value.trim().toUpperCase();
+      const sym = input.value.trim().toUpperCase().replace(/\s+/g, '');
       if (!sym) return;
-      const r = await api(`/api/watchlist/${sym}`, { method: 'POST' });
-      logFeed(r.success ? `${sym} added` : `${sym} add failed: ${r.message}`, r.success ? 'ok' : 'warn');
-      input.value = '';
-      document.getElementById('search-dropdown').classList.remove('show');
-      await loadWatchlist();
-      if (r.success) selectSymbol(sym);
+      try {
+        const r = await api(`/api/watchlist/${sym}`, { method: 'POST' });
+        logFeed(r.success ? `${sym} 已加入自选` : `${sym} 加入失败: ${r.message}`, r.success ? 'ok' : 'warn');
+        input.value = '';
+        document.getElementById('search-dropdown').classList.remove('show');
+        await loadWatchlist();
+        if (r.success) selectSymbol(sym);
+      } catch (e) {
+        logFeed(`${sym} 加入失败: ${e.message}`, 'err');
+      }
     }
 
     async function selectSymbol(sym) {
       state.activeSymbol = sym;
-      document.getElementById('order-symbol').value = sym;
       await Promise.all([loadPrice(sym), loadChart(sym, state.period), loadWatchlist()]);
+    }
+
+    async function removeSymbol(e, sym) {
+      e.stopPropagation();
+      try {
+        await api(`/api/watchlist/${sym}`, { method: 'DELETE' });
+        logFeed(`${sym} 已从自选移除`, 'ok');
+        if (state.activeSymbol === sym) {
+          state.activeSymbol = 'AAPL';
+        }
+        await loadWatchlist();
+      } catch (err) {
+        logFeed(`删除 ${sym} 失败: ${err.message}`, 'err');
+      }
     }
 
     async function loadPrice(sym) {
@@ -733,35 +866,6 @@
       loadChart(state.activeSymbol, period);
     }
 
-    async function placeOrder() {
-      const payload = {
-        symbol: document.getElementById('order-symbol').value.trim().toUpperCase(),
-        side: document.getElementById('order-side').value,
-        order_type: document.getElementById('order-type').value,
-        quantity: Number(document.getElementById('order-qty').value),
-        limit_price: document.getElementById('order-limit').value ? Number(document.getElementById('order-limit').value) : null,
-      };
-
-      if (!payload.symbol || !payload.quantity) {
-        document.getElementById('order-result').textContent = 'symbol 和 quantity 必填';
-        return;
-      }
-
-      try {
-        const res = await api('/api/orders/execute', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        document.getElementById('order-result').textContent = JSON.stringify(res);
-        logFeed(`order ${res.status || 'unknown'}: ${res.order_id || '-'} ${res.error || ''}`, res.success ? 'ok' : 'warn');
-        await loadOrdersPositionsRuns();
-      } catch (e) {
-        document.getElementById('order-result').textContent = e.message;
-        logFeed(`下单失败: ${e.message}`, 'err');
-      }
-    }
-
     async function createStrategy() {
       const payload = {
         name: document.getElementById('st-name').value.trim(),
@@ -776,7 +880,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      logFeed(`strategy created #${r.strategy_id}`, 'ok');
+      logFeed(`策略创建成功 #${r.strategy_id}`, 'ok');
       await loadStrategies();
     }
 
@@ -784,10 +888,10 @@
       const rows = await api('/api/strategies');
       const box = document.getElementById('strategies-list');
       if (!rows.length) {
-        box.innerHTML = '<div class="tiny muted">No strategies yet.</div>';
+        box.innerHTML = '<div class="tiny muted">暂无策略，请先创建。</div>';
         return;
       }
-      box.innerHTML = `<table><thead><tr><th>Name</th><th>Symbol</th><th>Status</th></tr></thead><tbody>${rows.map(r =>
+      box.innerHTML = `<table><thead><tr><th>名称</th><th>代码</th><th>状态</th></tr></thead><tbody>${rows.map(r =>
         `<tr><td>${r.name}</td><td class="mono">${r.symbol}</td><td>${r.status}</td></tr>`).join('')}</tbody></table>`;
     }
 
@@ -796,7 +900,7 @@
       const name = document.getElementById('rule-name').value.trim() || type;
       let value = {};
       try { value = JSON.parse(document.getElementById('rule-json').value || '{}'); } catch {
-        logFeed('risk rule JSON 格式错误', 'err');
+        logFeed('风控规则 JSON 格式错误', 'err');
         return;
       }
 
@@ -805,7 +909,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rule_type: type, name, value, enabled: true }),
       });
-      logFeed(`risk rule created: ${type}`, 'ok');
+      logFeed(`风控规则已创建: ${type}`, 'ok');
       await loadRiskRules();
     }
 
@@ -813,11 +917,11 @@
       const rows = await api('/api/risk-rules');
       const box = document.getElementById('risk-list');
       if (!rows.length) {
-        box.innerHTML = '<div class="tiny muted">No risk rules.</div>';
+        box.innerHTML = '<div class="tiny muted">暂无风控规则。</div>';
         return;
       }
-      box.innerHTML = `<table><thead><tr><th>Name</th><th>Type</th><th>Enabled</th></tr></thead><tbody>${rows.map(r =>
-        `<tr><td>${r.name}</td><td class="mono">${r.rule_type}</td><td>${r.enabled ? 'yes' : 'no'}</td></tr>`).join('')}</tbody></table>`;
+      box.innerHTML = `<table><thead><tr><th>名称</th><th>类型</th><th>启用</th></tr></thead><tbody>${rows.map(r =>
+        `<tr><td>${r.name}</td><td class="mono">${r.rule_type}</td><td>${r.enabled ? '是' : '否'}</td></tr>`).join('')}</tbody></table>`;
     }
 
     async function loadOrdersPositionsRuns() {
@@ -842,7 +946,7 @@
     }
 
     function renderTable(cols, rows) {
-      if (!rows.length) return '<div class="tiny muted">No data.</div>';
+      if (!rows.length) return '<div class="tiny muted">暂无数据。</div>';
       return `<table><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.map(r =>
         `<tr>${cols.map(c => `<td class="${c.includes('id') || c.includes('symbol') ? 'mono' : ''}">${r[c] ?? ''}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
     }
@@ -881,7 +985,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      logFeed(`agent profile saved: ${res.profile.agent_name}`, 'ok');
+      logFeed(`Agent 配置已保存: ${res.profile.agent_name}`, 'ok');
     }
 
     function appendChat(role, text) {
@@ -919,6 +1023,7 @@
     }
 
     function connectWS() {
+      if (!state.wsEnabled) return;
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       state.ws = new WebSocket(`${proto}://${location.host}/ws`);
 
@@ -932,9 +1037,15 @@
         }
       };
 
-      state.ws.onclose = () => setTimeout(connectWS, 4000);
+      state.ws.onclose = () => {
+        if (state.wsEnabled) {
+          setApiStatus(false, '实时连接断开');
+          setTimeout(connectWS, 4000);
+        }
+      };
 
-      setInterval(() => {
+      if (state.wsHeartbeatTimer) clearInterval(state.wsHeartbeatTimer);
+      state.wsHeartbeatTimer = setInterval(() => {
         if (state.ws && state.ws.readyState === WebSocket.OPEN) state.ws.send('ping');
       }, 30000);
     }
@@ -979,9 +1090,29 @@
       await loadPrice(state.activeSymbol);
       await loadChart(state.activeSymbol, state.period);
       await loadAgentConfig();
-      await loadStrategies();
-      await loadRiskRules();
-      await loadOrdersPositionsRuns();
+    }
+
+    async function pingHealth() {
+      try {
+        const h = await api('/api/health', { timeoutMs: 2500 }, 0);
+        const shouldEnableWs = h.ws_enabled !== false;
+        if (shouldEnableWs && !state.wsEnabled) {
+          state.wsEnabled = true;
+          connectWS();
+        } else if (!shouldEnableWs && state.wsEnabled) {
+          state.wsEnabled = false;
+          if (state.ws) state.ws.close();
+          if (state.wsHeartbeatTimer) clearInterval(state.wsHeartbeatTimer);
+        }
+      } catch {}
+    }
+
+    function ensureAccessMode() {
+      const banner = document.getElementById('access-banner');
+      if (location.protocol === 'file:') {
+        banner.classList.add('show');
+        banner.innerHTML = '当前是本地文件打开，接口不可用。请改用 <span class="mono">http://127.0.0.1:8080/</span> 访问。';
+      }
     }
 
     document.addEventListener('keydown', (e) => {
@@ -990,10 +1121,13 @@
     });
 
     initChart();
-    connectWS();
-    loadAllData();
+    ensureAccessMode();
+    loadAllData().then(() => {
+      if (state.wsEnabled) connectWS();
+    });
+    setInterval(pingHealth, 8000);
     changePeriod('1d', document.querySelector('.periods .btn'));
-    appendChat('ai', 'Agent Studio 就绪。请先在上方配置 Agent 模式，然后输入你的交易问题。');
+    appendChat('ai', '交易Agent工作台已就绪。先确认上方 Agent 配置，再输入你的交易问题。');
   </script>
 </body>
 </html>

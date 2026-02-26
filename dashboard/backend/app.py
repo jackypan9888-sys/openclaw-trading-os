@@ -1,5 +1,6 @@
 """OpenClaw Trading OS dashboard application factory."""
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -38,6 +39,16 @@ app.include_router(trading_router)
 app.include_router(ws_router)
 
 
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+
 @app.on_event("startup")
 async def startup():
-    asyncio.create_task(feed.start_polling())
+    fixed_mode = _env_flag("TRADING_OS_FIXED_MODE", True)
+    disable_polling = _env_flag("TRADING_OS_DISABLE_POLLING", fixed_mode)
+    if not disable_polling:
+        asyncio.create_task(feed.start_polling())

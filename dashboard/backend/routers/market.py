@@ -1,6 +1,7 @@
 """Market data and misc routes."""
 import asyncio
 import json
+import os
 import subprocess
 
 from fastapi import APIRouter
@@ -20,7 +21,22 @@ async def root():
 
 @api_router.get("/health")
 async def health():
-    return {"ok": True, "service": "trading-os-dashboard"}
+    def env_flag(name: str, default: bool) -> bool:
+        raw = os.getenv(name)
+        if raw is None:
+            return default
+        return raw.strip().lower() not in {"0", "false", "no", "off"}
+
+    fixed_mode = env_flag("TRADING_OS_FIXED_MODE", True)
+    ws_enabled = not env_flag("TRADING_OS_DISABLE_WS", fixed_mode)
+    polling_enabled = not env_flag("TRADING_OS_DISABLE_POLLING", fixed_mode)
+    return {
+        "ok": True,
+        "service": "trading-os-dashboard",
+        "fixed_mode": fixed_mode,
+        "ws_enabled": ws_enabled,
+        "polling_enabled": polling_enabled,
+    }
 
 
 POPULAR_SYMBOLS = [
@@ -107,10 +123,62 @@ async def search_symbols(q: str = ""):
 
 
 @api_router.get("/price/{symbol}")
-async def get_price(symbol: str):
+async def get_price(symbol: str, timeout: float = 8.0):
+    """获取股票价格（带缓存和超时降级）"""
     loop = asyncio.get_event_loop()
-    data = await loop.run_in_executor(None, provider.get_price, symbol.upper())
+    data = await loop.run_in_executor(None, lambda: provider.get_price(symbol.upper(), timeout=timeout))
     return data or {"error": f"No data for {symbol}"}
+
+
+@api_router.get("/prices")
+async def get_prices(symbols: str, timeout: float = 10.0):
+    """并行获取多个股票价格
+    
+    Args:
+        symbols: 逗号分隔的股票代码，如 "AAPL,TSLA,NVDA"
+        timeout: 总超时时间
+    """
+    symbol_list = [s.strip().upper() for s in symbols.split(",")]
+    if hasattr(provider, 'get_prices_parallel'):
+        results = await provider.get_prices_parallel(symbol_list, timeout=timeout)
+        return {"results": results, "count": len(results)}
+    else:
+        # 降级到串行获取
+        loop = asyncio.get_event_loop()
+        results = {}
+        for symbol in symbol_list:
+            data = await loop.run_in_executor(None, lambda: provider.get_price(symbol, timeout=5.0))
+            results[symbol] = data
+        return {"results": results, "count": len(results)}
+
+
+@api_router.get("/cache/status")
+async def get_cache_status():
+    """获取缓存状态"""
+    cached_prices = store.get_all_cached_prices()
+    return {
+        "cached_symbols": list(cached_prices.keys()),
+        "count": len(cached_prices),
+        "popular_stocks": [s["symbol"] for s in POPULAR_SYMBOLS[:10]],
+    }
+
+
+@api_router.post("/cache/preload")
+async def preload_cache():
+    """预加载热门股票到缓存"""
+    if hasattr(provider, 'preload_popular_stocks'):
+        result = await provider.preload_popular_stocks()
+        return {"ok": True, "message": f"预加载完成，共 {len(result)} 只股票"}
+    return {"ok": False, "message": "Provider 不支持预加载"}
+
+
+@api_router.post("/cache/clear")
+async def clear_cache():
+    """清理过期缓存"""
+    if hasattr(provider, 'clear_expired_cache'):
+        count = provider.clear_expired_cache()
+        return {"ok": True, "cleared": count}
+    return {"ok": False, "message": "Provider 不支持清理"}
 
 
 @api_router.get("/chart/{symbol}")

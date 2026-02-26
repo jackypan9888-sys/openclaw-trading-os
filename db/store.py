@@ -1,5 +1,7 @@
 import sqlite3
 import os
+import threading
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -16,7 +18,7 @@ from .models import (
     TIER_LIMITS,
 )
 
-DB_PATH = os.path.expanduser("~/.openclaw/trading-os/trading_os.db")
+DB_PATH = os.getenv("TRADING_OS_DB_PATH", os.path.expanduser("~/.openclaw/trading-os/trading_os.db"))
 SCHEMA_PATH = os.path.join(os.path.dirname(__file__), "schema.sql")
 
 
@@ -24,12 +26,38 @@ class DataStore:
     def __init__(self, db_path: str = DB_PATH):
         self.db_path = db_path
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        self.fallback_db_path = "/tmp/openclaw-trading-os.db"
+        self._lock = threading.RLock()
+        self._shared_conn: Optional[sqlite3.Connection] = None
 
-    def _conn(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys=ON")
-        return conn
+    def _open_connection(self) -> sqlite3.Connection:
+        last_err = None
+        for path in (self.db_path, self.fallback_db_path):
+            try:
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                conn = sqlite3.connect(path, timeout=8, check_same_thread=False)
+                conn.row_factory = sqlite3.Row
+                conn.execute("PRAGMA foreign_keys=ON")
+                conn.execute("PRAGMA journal_mode=WAL")
+                if path != self.db_path:
+                    self.db_path = path
+                return conn
+            except sqlite3.OperationalError as e:
+                last_err = e
+        raise last_err or sqlite3.OperationalError("unable to open database file")
+
+    @contextmanager
+    def _conn(self):
+        with self._lock:
+            if self._shared_conn is None:
+                self._shared_conn = self._open_connection()
+            conn = self._shared_conn
+            try:
+                yield conn
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
 
     def init_db(self):
         with open(SCHEMA_PATH) as f:
@@ -261,6 +289,78 @@ class DataStore:
     def clear_expired_cache(self):
         with self._conn() as conn:
             conn.execute("DELETE FROM analysis_cache WHERE expires_at <= datetime('now')")
+
+    # ── 价格缓存 ──────────────────────────────────────────────
+
+    def get_cached_price(self, symbol: str) -> Optional[dict]:
+        """获取缓存的价格数据，如果过期返回None"""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM price_cache WHERE symbol=? AND expires_at > datetime('now')",
+                (symbol.upper(),),
+            ).fetchone()
+            if row:
+                return {
+                    "symbol": row["symbol"],
+                    "price": row["price"],
+                    "change": row["change"],
+                    "change_pct": row["change_pct"],
+                    "currency": row["currency"],
+                    "market_cap": row["market_cap"],
+                    "pe_ratio": row["pe_ratio"],
+                    "volume": row["volume"],
+                    "cached": True,
+                    "timestamp": row["cached_at"],
+                }
+            return None
+
+    def set_cached_price(self, symbol: str, data: dict, ttl_minutes: int = 5):
+        """缓存价格数据，默认5分钟"""
+        expires = (datetime.utcnow() + timedelta(minutes=ttl_minutes)).isoformat()
+        with self._conn() as conn:
+            conn.execute(
+                """INSERT OR REPLACE INTO price_cache
+                (symbol, price, change, change_pct, currency, market_cap, pe_ratio, volume, expires_at)
+                VALUES(?,?,?,?,?,?,?,?,?)""",
+                (
+                    symbol.upper(),
+                    data.get("price", 0),
+                    data.get("change", 0),
+                    data.get("change_pct", 0),
+                    data.get("currency", "USD"),
+                    data.get("market_cap"),
+                    data.get("pe_ratio"),
+                    data.get("volume"),
+                    expires,
+                ),
+            )
+
+    def get_all_cached_prices(self) -> dict[str, dict]:
+        """获取所有未过期的缓存价格"""
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM price_cache WHERE expires_at > datetime('now')"
+            ).fetchall()
+            return {
+                row["symbol"]: {
+                    "symbol": row["symbol"],
+                    "price": row["price"],
+                    "change": row["change"],
+                    "change_pct": row["change_pct"],
+                    "currency": row["currency"],
+                    "market_cap": row["market_cap"],
+                    "pe_ratio": row["pe_ratio"],
+                    "volume": row["volume"],
+                    "cached": True,
+                }
+                for row in rows
+            }
+
+    def clear_expired_price_cache(self) -> int:
+        """清理过期的价格缓存，返回清理的数量"""
+        with self._conn() as conn:
+            cur = conn.execute("DELETE FROM price_cache WHERE expires_at <= datetime('now')")
+            return cur.rowcount
 
     # ── 交易域模型（Phase 2） ───────────────────────────────────
 

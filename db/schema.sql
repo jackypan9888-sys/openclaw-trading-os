@@ -56,6 +56,21 @@ CREATE TABLE IF NOT EXISTS analysis_cache (
     result_json  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS price_cache (
+    symbol       TEXT PRIMARY KEY,
+    price        REAL NOT NULL,
+    change       REAL NOT NULL DEFAULT 0,
+    change_pct   REAL NOT NULL DEFAULT 0,
+    currency     TEXT NOT NULL DEFAULT 'USD',
+    market_cap   REAL,
+    pe_ratio     REAL,
+    volume       REAL,
+    cached_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at   TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_price_cache_expires ON price_cache(expires_at);
+
 CREATE TABLE IF NOT EXISTS strategies (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

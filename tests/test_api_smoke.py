@@ -44,7 +44,7 @@ def test_agent_config_endpoint():
 
 
 def test_price_and_chart_with_stubbed_provider(monkeypatch):
-    def fake_price(symbol):
+    def fake_price(symbol, timeout=8.0):
         return {
             "symbol": symbol,
             "name": "Test",
