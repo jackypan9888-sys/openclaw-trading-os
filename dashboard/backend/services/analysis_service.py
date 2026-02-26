@@ -499,3 +499,49 @@ async def chat_with_agent(message: str, context: dict) -> dict:
     elif result and result.stderr.strip():
         fallback += f"\n错误摘要: {result.stderr.strip()[:180]}"
     return {"reply": fallback}
+
+
+async def stream_chat_with_agent(message: str, context: dict):
+    """
+    流式对话：优先通过 OpenClaw WebSocket Gateway 获取流式响应，
+    失败时降级为一次性调用后逐字模拟流式输出。
+    """
+    import os as _os
+    from openclaw_client import OpenClawClient
+
+    # 读取 Gateway token
+    token = ""
+    try:
+        openclaw_cfg = _os.path.expanduser("~/.openclaw/openclaw.json")
+        with open(openclaw_cfg) as f:
+            token = json.load(f).get("gatewayToken", "")
+    except Exception:
+        pass
+
+    # 构建 Agent prompt
+    active_symbol = context.get("activeSymbol", "")
+    profile = load_agent_profile()
+    contract = build_agent_contract(profile, context)
+    prompt = (
+        f"{contract}\n\n"
+        f"当前界面标的: {active_symbol or '未指定'}\n"
+        "请直接给出中文回复，结构为：结论 / 行动 / 风险 / 需确认。\n"
+        f"用户消息：{message}"
+    )
+
+    if token:
+        # 走 WebSocket 流式接口
+        client = OpenClawClient("ws://127.0.0.1:18789/rpc", token)
+        try:
+            async for chunk in client.stream_message(prompt, agent_id="trading-os"):
+                yield chunk
+        finally:
+            await client.close()
+    else:
+        # 降级：非流式调用后模拟流式（每 40 字一块）
+        result = await chat_with_agent(message, context)
+        reply = result.get("reply", "")
+        chunk_size = 40
+        for i in range(0, len(reply), chunk_size):
+            yield reply[i:i + chunk_size]
+            await asyncio.sleep(0.03)

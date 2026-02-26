@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OpenClaw Trading OS</title>
   <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 
@@ -313,14 +314,14 @@
 
     .tabs {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(6, 1fr);
       border-bottom: 1px solid var(--line);
     }
 
     .tab {
-      padding: 10px 8px;
+      padding: 8px 4px;
       text-align: center;
-      font-size: 12px;
+      font-size: 11px;
       color: var(--muted);
       cursor: pointer;
       border-bottom: 2px solid transparent;
@@ -347,6 +348,16 @@
     .msg { padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.45; }
     .msg.user { background: #274150; align-self: flex-end; max-width: 88%; }
     .msg.ai { background: #13232d; border: 1px solid #22404f; max-width: 95%; }
+    /* markdown 渲染样式 */
+    .msg.ai h1,.msg.ai h2,.msg.ai h3 { color: #18c29c; font-size: 12px; font-weight: 600; margin: 6px 0 2px; }
+    .msg.ai p { margin: 3px 0; }
+    .msg.ai ul,.msg.ai ol { margin: 3px 0; padding-left: 16px; }
+    .msg.ai li { margin: 1px 0; }
+    .msg.ai strong { color: #e0f7f0; }
+    .msg.ai code { background: #0d2029; padding: 1px 4px; border-radius: 3px; font-family: monospace; font-size: 11px; }
+    .msg.ai pre { background: #0d2029; padding: 8px; border-radius: 6px; overflow-x: auto; margin: 4px 0; }
+    .msg.ai pre code { background: none; padding: 0; }
+    .msg.ai hr { border: none; border-top: 1px solid #22404f; margin: 6px 0; }
 
     .meta-box {
       border: 1px solid var(--line);
@@ -502,9 +513,11 @@
       <section class="panel">
         <div class="tabs">
           <div class="tab active" data-tab="chat" onclick="switchTab(this)">交易Agent</div>
+          <div class="tab" data-tab="positions" onclick="switchTab(this)">持仓</div>
+          <div class="tab" data-tab="trade" onclick="switchTab(this)">交易</div>
           <div class="tab" data-tab="strategies" onclick="switchTab(this)">策略</div>
           <div class="tab" data-tab="risk" onclick="switchTab(this)">风控</div>
-          <div class="tab" data-tab="activity" onclick="switchTab(this)">活动</div>
+          <div class="tab" data-tab="settings" onclick="switchTab(this)">设置</div>
         </div>
 
         <div class="tab-pane active" id="tab-chat">
@@ -582,21 +595,73 @@
           <div id="risk-list"></div>
         </div>
 
-        <div class="tab-pane" id="tab-activity">
+        <!-- 持仓 Tab -->
+        <div class="tab-pane" id="tab-positions">
+          <div class="row" style="margin-bottom:10px">
+            <button class="btn" onclick="loadPositionsTab()">刷新</button>
+            <button class="btn primary" onclick="switchToTradeTab()">+ 新建交易</button>
+          </div>
+          <div id="positions-cards"></div>
+          <div style="margin-top:12px">
+            <div class="tiny muted" style="margin-bottom:6px">近期订单</div>
+            <div id="positions-orders-table"></div>
+          </div>
+        </div>
+
+        <!-- 交易 Tab -->
+        <div class="tab-pane" id="tab-trade">
           <div class="meta-box" style="margin-bottom:10px">
-            <button class="btn" onclick="loadOrdersPositionsRuns()">刷新活动</button>
+            <div class="tiny muted" style="margin-bottom:8px">纸交易下单 — <span id="trade-symbol-label" style="color:var(--brand)">AAPL</span></div>
+            <div class="grid-2" style="margin-bottom:8px">
+              <select id="trade-side">
+                <option value="BUY">买入 BUY</option>
+                <option value="SELL">卖出 SELL</option>
+              </select>
+              <select id="trade-type">
+                <option value="MARKET">市价单 MARKET</option>
+                <option value="LIMIT">限价单 LIMIT</option>
+              </select>
+              <input id="trade-qty" type="number" min="1" step="1" placeholder="数量 (股)" />
+              <input id="trade-limit-price" type="number" step="0.01" placeholder="限价（市价单忽略）" />
+            </div>
+            <div class="tiny muted" style="margin-bottom:8px" id="trade-price-hint">当前价: 加载中…</div>
+            <button class="btn primary" style="width:100%" onclick="confirmTrade()">确认下单</button>
           </div>
-          <div class="meta-box" style="margin-bottom:8px">
-            <div class="tiny muted" style="margin-bottom:6px">订单</div>
-            <div id="orders-table"></div>
+          <div style="margin-top:10px">
+            <div class="tiny muted" style="margin-bottom:6px">今日订单</div>
+            <div id="trade-orders-table"></div>
           </div>
-          <div class="meta-box" style="margin-bottom:8px">
-            <div class="tiny muted" style="margin-bottom:6px">持仓</div>
-            <div id="positions-table"></div>
+        </div>
+
+        <!-- 设置 Tab -->
+        <div class="tab-pane" id="tab-settings">
+          <div class="meta-box" style="margin-bottom:10px">
+            <div class="tiny muted" style="margin-bottom:8px;font-weight:600">执行模式</div>
+            <div class="grid-2" style="margin-bottom:8px">
+              <select id="exec-mode-select">
+                <option value="PAPER">PAPER — 纸交易</option>
+                <option value="LIVE">LIVE — 实盘</option>
+              </select>
+              <button id="kill-switch-btn" class="btn" onclick="toggleKillSwitch()">熔断开关: 关闭</button>
+            </div>
+            <button class="btn primary" onclick="saveExecConfig()">保存执行配置</button>
+          </div>
+          <div class="meta-box" style="margin-bottom:10px">
+            <div class="tiny muted" style="margin-bottom:8px;font-weight:600">AI 模型配置</div>
+            <div id="ai-config-display" class="tiny muted">加载中…</div>
+            <div class="grid-2" style="margin-top:8px">
+              <input id="ai-provider" placeholder="Provider (e.g. kimi)" />
+              <input id="ai-model" placeholder="Model (e.g. kimi-k2)" />
+            </div>
+            <div style="margin-top:6px">
+              <input id="ai-api-key" type="password" placeholder="API Key（留空不修改）" style="width:100%;box-sizing:border-box" />
+            </div>
+            <button class="btn primary" style="margin-top:8px" onclick="saveAIConfig()">保存 AI 配置</button>
           </div>
           <div class="meta-box">
-            <div class="tiny muted" style="margin-bottom:6px">Agent 执行记录</div>
-            <div id="runs-table"></div>
+            <div class="tiny muted" style="margin-bottom:6px;font-weight:600">Agent 执行记录</div>
+            <div id="settings-runs-table"></div>
+            <button class="btn" style="margin-top:6px" onclick="loadSettingsRuns()">加载记录</button>
           </div>
         </div>
       </section>
@@ -604,10 +669,21 @@
   </div>
 
   <script>
+    // Period → {yfinance period, interval} 映射
+    // 1D 用 5min K线看今日走势；5D 用 30min；1M+ 用日线
+    const PERIOD_CONFIG = {
+      '1d':  { period: '1d',  interval: '5m'  },
+      '5d':  { period: '5d',  interval: '30m' },
+      '1mo': { period: '1mo', interval: '1d'  },
+      '3mo': { period: '3mo', interval: '1d'  },
+      '6mo': { period: '6mo', interval: '1d'  },
+    };
+
     const state = {
       activeSymbol: 'AAPL',
       prices: {},
       period: '1d',
+      lastCandle: null,   // 追踪当前图表最后一根蜡烛，用于实时更新
       ws: null,
       wsHeartbeatTimer: null,
       wsEnabled: true,
@@ -615,9 +691,11 @@
       candle: null,
       apiOk: true,
       loadedTabs: {
-        strategy: false,
+        strategies: false,
         risk: false,
-        activity: false,
+        positions: false,
+        trade: false,
+        settings: false,
       },
     };
 
@@ -716,17 +794,232 @@
       document.querySelectorAll('.tab-pane').forEach(x => x.classList.remove('active'));
       document.getElementById(`tab-${tab}`).classList.add('active');
 
-      if (tab === 'strategy' && !state.loadedTabs.strategy) {
+      if (tab === 'strategies' && !state.loadedTabs.strategies) {
         await loadStrategies();
-        state.loadedTabs.strategy = true;
+        state.loadedTabs.strategies = true;
       }
       if (tab === 'risk' && !state.loadedTabs.risk) {
         await loadRiskRules();
         state.loadedTabs.risk = true;
       }
-      if (tab === 'activity' && !state.loadedTabs.activity) {
-        await loadOrdersPositionsRuns();
-        state.loadedTabs.activity = true;
+      if (tab === 'positions' && !state.loadedTabs.positions) {
+        await loadPositionsTab();
+        state.loadedTabs.positions = true;
+      }
+      if (tab === 'trade') {
+        updateTradePriceHint();
+        if (!state.loadedTabs.trade) {
+          await loadTradeOrders();
+          state.loadedTabs.trade = true;
+        }
+      }
+      if (tab === 'settings' && !state.loadedTabs.settings) {
+        await loadSettingsTab();
+        state.loadedTabs.settings = true;
+      }
+    }
+
+    function switchToTradeTab() {
+      const tradeBtn = document.querySelector('[data-tab="trade"]');
+      if (tradeBtn) switchTab(tradeBtn);
+    }
+
+    // ── 持仓 Tab ──────────────────────────────────────────────────
+    async function loadPositionsTab() {
+      try {
+        const [positions, orders] = await Promise.all([
+          api('/api/positions'),
+          api('/api/orders?limit=15'),
+        ]);
+        renderPositionCards(positions);
+        document.getElementById('positions-orders-table').innerHTML = renderOrdersTable(orders);
+      } catch (e) {
+        document.getElementById('positions-cards').innerHTML = `<div class="tiny muted">加载失败: ${e.message}</div>`;
+      }
+    }
+
+    function renderPositionCards(positions) {
+      const box = document.getElementById('positions-cards');
+      if (!positions.length) {
+        box.innerHTML = '<div class="tiny muted">暂无持仓。请先在"交易"tab 下单。</div>';
+        return;
+      }
+      box.innerHTML = positions.map(p => {
+        const pnl = Number(p.unrealized_pnl || 0);
+        const cost = Number(p.avg_cost || 0);
+        const last = Number(p.last_price || 0);
+        const pnlPct = cost > 0 && last > 0 ? ((last - cost) / cost * 100).toFixed(2) : null;
+        const cls = pnl >= 0 ? 'price-up' : 'price-down';
+        return `
+          <div class="meta-box" style="margin-bottom:8px">
+            <div class="row" style="justify-content:space-between;align-items:flex-start">
+              <div>
+                <div class="mono" style="font-size:15px;font-weight:600">${p.symbol}</div>
+                <div class="tiny muted">${p.quantity} 股 @ 均价 $${cost.toFixed(2)}</div>
+              </div>
+              <div style="text-align:right">
+                <div class="mono" style="font-size:14px">${last ? '$' + last.toFixed(2) : '--'}</div>
+                ${pnlPct !== null ? `<div class="mono ${cls}" style="font-size:12px">${pnl >= 0 ? '+' : ''}${pnlPct}%  ($${pnl.toFixed(2)})</div>` : ''}
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // ── 交易 Tab ──────────────────────────────────────────────────
+    function updateTradePriceHint() {
+      const sym = state.activeSymbol || 'AAPL';
+      document.getElementById('trade-symbol-label').textContent = sym;
+      const priceData = state.prices[sym];
+      const hint = priceData?.price
+        ? `当前价: $${Number(priceData.price).toFixed(2)} (${sym})`
+        : `当前价: 加载中… (${sym})`;
+      document.getElementById('trade-price-hint').textContent = hint;
+    }
+
+    async function confirmTrade() {
+      const sym = state.activeSymbol || 'AAPL';
+      const side = document.getElementById('trade-side').value;
+      const qty = parseFloat(document.getElementById('trade-qty').value);
+      const orderType = document.getElementById('trade-type').value;
+      const limitPrice = parseFloat(document.getElementById('trade-limit-price').value) || null;
+
+      if (!qty || qty <= 0) { logFeed('请输入有效数量', 'warn'); return; }
+
+      const priceData = state.prices[sym];
+      const priceHint = priceData?.price ? `$${Number(priceData.price).toFixed(2)}` : '市价';
+      const msg = `纸交易确认：以 ${priceHint} ${side === 'BUY' ? '买入' : '卖出'} ${qty} 股 ${sym}（${orderType}）`;
+
+      if (!confirm(msg)) return;
+
+      try {
+        const body = { symbol: sym, side, order_type: orderType, quantity: qty };
+        if (limitPrice) body.limit_price = limitPrice;
+        if (priceData?.price) body.price_hint = priceData.price;
+        const r = await api('/api/orders/paper', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (r.success) {
+          logFeed(`✓ 订单已提交: ${side} ${qty} ${sym} — ID #${r.order_id}`, 'ok');
+          document.getElementById('trade-qty').value = '';
+          state.loadedTabs.positions = false; // 持仓需要重新加载
+          await loadTradeOrders();
+        } else {
+          logFeed(`订单失败: ${r.message || JSON.stringify(r)}`, 'err');
+        }
+      } catch (e) {
+        logFeed(`下单异常: ${e.message}`, 'err');
+      }
+    }
+
+    async function loadTradeOrders() {
+      try {
+        const orders = await api('/api/orders?limit=20');
+        document.getElementById('trade-orders-table').innerHTML = renderOrdersTable(orders);
+      } catch (e) {
+        document.getElementById('trade-orders-table').innerHTML = `<div class="tiny muted">加载失败: ${e.message}</div>`;
+      }
+    }
+
+    function renderOrdersTable(orders) {
+      if (!orders.length) return '<div class="tiny muted">暂无订单。</div>';
+      return `<table><thead><tr><th>#</th><th>标的</th><th>方向</th><th>数量</th><th>类型</th><th>状态</th></tr></thead><tbody>` +
+        orders.map(o => {
+          const sideCls = o.side === 'BUY' ? 'price-up' : 'price-down';
+          return `<tr>
+            <td class="mono">${o.id}</td>
+            <td class="mono">${o.symbol}</td>
+            <td class="mono ${sideCls}">${o.side}</td>
+            <td>${o.quantity}</td>
+            <td class="mono">${o.order_type}</td>
+            <td class="mono">${o.status}</td>
+          </tr>`;
+        }).join('') + '</tbody></table>';
+    }
+
+    // ── 设置 Tab ──────────────────────────────────────────────────
+    async function loadSettingsTab() {
+      await Promise.all([loadExecConfigSettings(), loadAIConfigSettings(), loadSettingsRuns()]);
+    }
+
+    async function loadExecConfigSettings() {
+      try {
+        const cfg = await api('/api/execution/config');
+        document.getElementById('exec-mode-select').value = cfg.mode || 'PAPER';
+        const btn = document.getElementById('kill-switch-btn');
+        btn.textContent = `熔断开关: ${cfg.kill_switch ? '开启' : '关闭'}`;
+        btn.className = `btn ${cfg.kill_switch ? 'danger' : ''}`;
+        btn.dataset.active = cfg.kill_switch ? '1' : '0';
+      } catch (e) { logFeed(`加载执行配置失败: ${e.message}`, 'err'); }
+    }
+
+    async function loadAIConfigSettings() {
+      try {
+        const cfg = await api('/api/ai/config');
+        document.getElementById('ai-provider').value = cfg.provider || '';
+        document.getElementById('ai-model').value = cfg.model || '';
+        const disp = document.getElementById('ai-config-display');
+        disp.textContent = `当前: ${cfg.provider || '未配置'} / ${cfg.model || '未配置'}`;
+      } catch (e) {
+        document.getElementById('ai-config-display').textContent = '加载失败';
+      }
+    }
+
+    async function saveExecConfig() {
+      const mode = document.getElementById('exec-mode-select').value;
+      const killActive = document.getElementById('kill-switch-btn').dataset.active === '1';
+      try {
+        const r = await api('/api/execution/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode, kill_switch: killActive }),
+        });
+        document.getElementById('mode-pill').textContent = `执行模式: ${r.mode}`;
+        document.getElementById('kill-pill').textContent = `熔断开关: ${r.kill_switch ? '开启' : '关闭'}`;
+        logFeed(`执行配置已更新: ${r.mode}, 熔断 ${r.kill_switch ? '开启' : '关闭'}`, 'ok');
+      } catch (e) { logFeed(`保存失败: ${e.message}`, 'err'); }
+    }
+
+    function toggleKillSwitch() {
+      const btn = document.getElementById('kill-switch-btn');
+      const next = btn.dataset.active !== '1';
+      btn.dataset.active = next ? '1' : '0';
+      btn.textContent = `熔断开关: ${next ? '开启' : '关闭'}`;
+      btn.className = `btn ${next ? 'danger' : ''}`;
+    }
+
+    async function saveAIConfig() {
+      const provider = document.getElementById('ai-provider').value.trim();
+      const model = document.getElementById('ai-model').value.trim();
+      const apiKey = document.getElementById('ai-api-key').value.trim();
+      const payload = {};
+      if (provider) payload.provider = provider;
+      if (model) payload.model = model;
+      if (apiKey) payload.api_key = apiKey;
+      if (!Object.keys(payload).length) { logFeed('没有要更新的 AI 配置', 'warn'); return; }
+      try {
+        const r = await api('/api/ai/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        logFeed('AI 配置已保存', 'ok');
+        document.getElementById('ai-config-display').textContent = `当前: ${r.provider || provider} / ${r.model || model}`;
+        document.getElementById('ai-api-key').value = '';
+      } catch (e) { logFeed(`AI 配置保存失败: ${e.message}`, 'err'); }
+    }
+
+    async function loadSettingsRuns() {
+      try {
+        const runs = await api('/api/agent-runs?limit=20');
+        document.getElementById('settings-runs-table').innerHTML = renderTable(
+          ['id', 'run_type', 'status', 'started_at'],
+          runs
+        );
+      } catch (e) {
+        document.getElementById('settings-runs-table').innerHTML = `<div class="tiny muted">加载失败</div>`;
       }
     }
 
@@ -814,6 +1107,7 @@
     async function selectSymbol(sym) {
       state.activeSymbol = sym;
       await Promise.all([loadPrice(sym), loadChart(sym, state.period), loadWatchlist()]);
+      updateTradePriceHint();
     }
 
     async function removeSymbol(e, sym) {
@@ -845,7 +1139,8 @@
     }
 
     async function loadChart(sym, period) {
-      const data = await api(`/api/chart/${sym}?period=${period}`);
+      const cfg = PERIOD_CONFIG[period] || { period, interval: '1d' };
+      const data = await api(`/api/chart/${sym}?period=${cfg.period}&interval=${cfg.interval}`);
       if (!data || !data.data || !data.data.length) return;
       const candles = data.data
         .map(d => ({
@@ -857,6 +1152,22 @@
 
       state.candle.setData(candles);
       state.chart.timeScale().fitContent();
+      // 保存最后一根蜡烛，用于实时价格更新
+      state.lastCandle = candles.length ? candles[candles.length - 1] : null;
+    }
+
+    // 用当前实时价格更新最后一根蜡烛（无需重新请求图表数据）
+    function updateLastCandle(price) {
+      if (!state.lastCandle || !state.candle) return;
+      const updated = {
+        time:  state.lastCandle.time,
+        open:  state.lastCandle.open,
+        high:  Math.max(state.lastCandle.high, price),
+        low:   Math.min(state.lastCandle.low,  price),
+        close: price,
+      };
+      state.candle.update(updated);
+      state.lastCandle = updated;
     }
 
     function changePeriod(period, btn) {
@@ -1008,17 +1319,63 @@
       if (!text) return;
       input.value = '';
       appendChat('user', text);
-      appendChat('ai', '思考中...');
-      const loading = document.querySelector('#chat-box .msg.ai:last-child');
+
+      // 创建一个空的 AI 气泡，流式向里追加内容
+      const box = document.getElementById('chat-box');
+      const bubble = document.createElement('div');
+      bubble.className = 'msg ai streaming';
+      bubble.textContent = '';
+      box.appendChild(bubble);
+      box.scrollTop = box.scrollHeight;
+
+      let fullText = '';
       try {
-        const res = await api('/api/chat', {
+        const resp = await fetch('/api/chat/stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: text, context: { activeSymbol: state.activeSymbol } }),
         });
-        loading.innerHTML = (res.reply || 'no reply').replace(/\n/g, '<br>');
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          // 解析 SSE 行
+          const lines = buf.split('\n');
+          buf = lines.pop(); // 保留不完整的最后一行
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            try {
+              const d = JSON.parse(line.slice(6));
+              if (d.type === 'chunk' && d.text) {
+                fullText += d.text;
+                // 流式中用纯文本+换行（快速，避免重复 parse）
+                bubble.textContent = fullText;
+                bubble.classList.add('streaming');
+                box.scrollTop = box.scrollHeight;
+              }
+              if (d.type === 'done' || d.type === 'error') break;
+            } catch {}
+          }
+        }
       } catch (e) {
-        loading.innerHTML = `请求失败: ${e.message}`;
+        fullText = `请求失败: ${e.message}`;
+        bubble.textContent = fullText;
+      } finally {
+        bubble.classList.remove('streaming');
+        if (!fullText) {
+          bubble.textContent = '（无响应，请检查 OpenClaw 连接）';
+        } else {
+          // 流式结束后用 marked 渲染完整 markdown
+          bubble.innerHTML = typeof marked !== 'undefined'
+            ? marked.parse(fullText)
+            : fullText.replace(/\n/g, '<br>');
+        }
+        box.scrollTop = box.scrollHeight;
       }
     }
 
@@ -1033,6 +1390,8 @@
           state.prices[data.symbol] = data;
           if (data.symbol === state.activeSymbol) {
             loadPrice(data.symbol);
+            // 实时更新 K 线最后一根蜡烛（close/high/low 跟随最新价）
+            if (data.price) updateLastCandle(data.price);
           }
         }
       };

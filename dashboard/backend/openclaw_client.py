@@ -127,6 +127,47 @@ class OpenClawClient:
         except Exception as e:
             return f"Error: {str(e)}"
     
+    async def stream_message(self, message: str, agent_id: str = "trading-os"):
+        """流式发送消息，逐 chunk yield 文本（async generator）"""
+        if not self.authenticated:
+            if not await self.connect():
+                yield "连接 OpenClaw 失败，请检查本地 Gateway 是否运行"
+                return
+
+        self.request_id += 1
+        request = {
+            "jsonrpc": "2.0",
+            "id": self.request_id,
+            "method": "agent.chat",
+            "params": {"message": message, "agentId": agent_id},
+        }
+        try:
+            await self.ws.send(json.dumps(request))
+            while True:
+                response = await asyncio.wait_for(self.ws.recv(), timeout=120)
+                data = json.loads(response)
+                if data.get("type") == "event":
+                    event = data.get("event", "")
+                    if event == "agent.chunk":
+                        chunk = data.get("payload", {}).get("text", "")
+                        if chunk:
+                            yield chunk
+                    elif event == "agent.done":
+                        break
+                    elif event == "agent.error":
+                        yield f"\n错误: {data.get('payload', {}).get('message', 'Unknown')}"
+                        break
+                elif "result" in data:
+                    yield data["result"].get("reply", data["result"].get("message", ""))
+                    break
+                elif "error" in data:
+                    yield f"\n错误: {data['error'].get('message', '')}"
+                    break
+        except asyncio.TimeoutError:
+            yield "\n[响应超时，请重试]"
+        except Exception as e:
+            yield f"\n[流式读取异常: {e}]"
+
     async def close(self):
         """关闭连接"""
         if self.ws:

@@ -181,10 +181,42 @@ async def clear_cache():
     return {"ok": False, "message": "Provider 不支持清理"}
 
 
+def _fetch_chart_intraday(symbol: str, period: str, interval: str) -> dict | None:
+    """yfinance 直接获取分钟/小时级别 K 线（provider 不支持 interval）"""
+    try:
+        import yfinance as yf
+        from datetime import datetime
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period=period, interval=interval)
+        if hist.empty:
+            return None
+        return {
+            "symbol": symbol,
+            "period": period,
+            "interval": interval,
+            "data": [
+                {
+                    "date": idx.isoformat(),
+                    "open":   round(float(row["Open"]),   4),
+                    "high":   round(float(row["High"]),   4),
+                    "low":    round(float(row["Low"]),    4),
+                    "close":  round(float(row["Close"]),  4),
+                    "volume": int(row["Volume"]),
+                }
+                for idx, row in hist.iterrows()
+            ],
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @api_router.get("/chart/{symbol}")
-async def get_chart(symbol: str, period: str = "5d"):
+async def get_chart(symbol: str, period: str = "5d", interval: str = "1d"):
     loop = asyncio.get_event_loop()
-    data = await loop.run_in_executor(None, provider.get_chart_data, symbol.upper(), period)
+    if interval != "1d":
+        data = await loop.run_in_executor(None, _fetch_chart_intraday, symbol.upper(), period, interval)
+    else:
+        data = await loop.run_in_executor(None, provider.get_chart_data, symbol.upper(), period)
     return data or {"error": f"No chart data for {symbol}"}
 
 
